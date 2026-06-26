@@ -1,0 +1,8 @@
+# Pick and Place Export
+# Source: Example CAD Tool
+# Units: mm
+Designator,Comment,Footprint,Mid X,Mid Y,Rotation,Layer
+R1,10k,0603,12.500,33.100,90,Top
+C1,100n,0402,14.800,31.900,180,Top
+U1,STM32F103,LQFP-48,40.000,25.000,0,Top
+D1,LED RED,0603,8.250,10.500,270,Bottom

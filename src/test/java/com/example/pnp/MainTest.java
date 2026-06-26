@@ -1,0 +1,171 @@
+package com.example.pnp;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Tests for {@link Main} CLI entry point.
+ */
+class MainTest {
+
+    @TempDir
+    Path tempDir;
+
+    // ============================================================
+    //  Scenario: File not found
+    // ============================================================
+
+    @Test
+    void fileNotFound() throws IOException {
+        var exitCode = Main.run(new String[]{"/nonexistent/file.csv"});
+        assertEquals(1, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: Missing file argument
+    // ============================================================
+
+    @Test
+    void missingFileArgument() throws IOException {
+        var exitCode = Main.run(new String[]{});
+        assertEquals(1, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: Invalid --first value (negative)
+    // ============================================================
+
+    @Test
+    void negativeFirstValue() throws IOException {
+        var file = createTempFile("content");
+        var exitCode = Main.run(new String[]{file.toString(), "--first", "-5"});
+        assertEquals(1, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: Invalid --first value (zero)
+    // ============================================================
+
+    @Test
+    void zeroFirstValue() throws IOException {
+        var file = createTempFile("content");
+        var exitCode = Main.run(new String[]{file.toString(), "--first", "0"});
+        assertEquals(1, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: Invalid --last value (negative)
+    // ============================================================
+
+    @Test
+    void negativeLastValue() throws IOException {
+        var file = createTempFile("content");
+        var exitCode = Main.run(new String[]{file.toString(), "--last", "-5"});
+        assertEquals(1, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: Invalid --last value (zero)
+    // ============================================================
+
+    @Test
+    void zeroLastValue() throws IOException {
+        var file = createTempFile("content");
+        var exitCode = Main.run(new String[]{file.toString(), "--last", "0"});
+        assertEquals(1, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: --first without value
+    // ============================================================
+
+    @Test
+    void firstFlagWithoutValue() throws IOException {
+        var file = createTempFile("content");
+        var exitCode = Main.run(new String[]{file.toString(), "--first"});
+        assertEquals(1, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: --last without value
+    // ============================================================
+
+    @Test
+    void lastFlagWithoutValue() throws IOException {
+        var file = createTempFile("content");
+        var exitCode = Main.run(new String[]{file.toString(), "--last"});
+        assertEquals(1, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: --first with non-integer value
+    // ============================================================
+
+    @Test
+    void firstFlagWithNonInteger() throws IOException {
+        var file = createTempFile("content");
+        var exitCode = Main.run(new String[]{file.toString(), "--first", "abc"});
+        assertEquals(1, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: unknown option
+    // ============================================================
+
+    @Test
+    void unknownOption() throws IOException {
+        var file = createTempFile("content");
+        var exitCode = Main.run(new String[]{file.toString(), "--unknown"});
+        assertEquals(1, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: valid invocation produces exit code 0
+    // ============================================================
+
+    @Test
+    void validInvocationReturnsZero(@TempDir Path tempDir) throws IOException {
+        var file = createTempFile("line1\nline2\nline3\n");
+        var exitCode = Main.run(new String[]{file.toString()});
+        assertEquals(0, exitCode);
+    }
+
+    // ============================================================
+    //  Scenario: valid invocation with custom counts
+    // ============================================================
+
+    @Test
+    void validInvocationWithCustomCounts(@TempDir Path tempDir) throws IOException {
+        var file = createTempFile(generateLines(50));
+        var exitCode = Main.run(new String[]{file.toString(), "--first", "10", "--last", "5"});
+        assertEquals(0, exitCode);
+    }
+
+    // ============================================================
+    // Helpers
+    // ============================================================
+
+    private Path createTempFile(String content) throws IOException {
+        var file = tempDir.resolve("test.csv");
+        try (var writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+            writer.write(content);
+        }
+        return file;
+    }
+
+    private static String generateLines(int count) {
+        var sb = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            sb.append("Line ").append(i).append('\n');
+        }
+        return sb.toString();
+    }
+}
