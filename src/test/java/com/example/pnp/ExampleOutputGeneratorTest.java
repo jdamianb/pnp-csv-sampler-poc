@@ -21,6 +21,11 @@ import static org.junit.jupiter.api.Assertions.*;
  * then compares the detect result against the expected config in expected-configs/.
  * <p>
  * Output files are written to target/example-outputs/ for manual inspection.
+ * <p>
+ * By default, uses StubLlmClient. To use a real LLM (Ollama), set:
+ * {@code -Dllm.integration=true} and optionally
+ * {@code -Dllm.url=http://localhost:11434} and
+ * {@code -Dllm.model=qwen2.5:3b}
  */
 class ExampleOutputGeneratorTest {
 
@@ -41,10 +46,25 @@ class ExampleOutputGeneratorTest {
         assertFalse(sampleFiles.isEmpty(),
                 "No example files found in " + EXAMPLES_DIR);
 
+        // Determine LLM client: use Ollama if integration test flag is set
+        var useRealLlm = "true".equals(System.getProperty("llm.integration"));
+        var llmClient = useRealLlm ? createOllamaClient() : createStubClient();
+
+        if (useRealLlm) {
+            System.out.println("Using Ollama LLM client for detection");
+        } else {
+            System.out.println("Using StubLlmClient — set -Dllm.integration=true for real LLM");
+        }
+
+        var promptBuilder = new FormatDetectionPromptBuilder();
+        var validator = new PnpImportFormatConfigValidator();
+        var detector = new Detector(promptBuilder, llmClient, validator, mapper);
+
         int total = 0;
         int matched = 0;
         int mismatched = 0;
         int missingExpected = 0;
+        int errors = 0;
         var details = new ArrayList<String>();
 
         for (var file : sampleFiles) {
@@ -66,49 +86,54 @@ class ExampleOutputGeneratorTest {
             System.out.println("  wrote: " + sampleOutput.getFileName());
 
             // --- Generate detect output ---
-            var promptBuilder = new FormatDetectionPromptBuilder();
-            var stubJson = createDefaultStubJson();
-            var llmClient = new StubLlmClient(stubJson);
-            var validator = new PnpImportFormatConfigValidator();
-            var detector = new Detector(promptBuilder, llmClient, validator, mapper);
+            try {
+                var result = detector.detect(sampleResult);
 
-            var result = detector.detect(sampleResult);
-
-            if (result.isValid()) {
-                mapper.writeValue(detectOutput.toFile(), result.config());
-            } else {
-                mapper.writeValue(detectOutput.toFile(), Map.of(
-                        "file", file.getFileName().toString(),
-                        "error", "detection failed",
-                        "details", result.errors()
-                ));
-            }
-            System.out.println("  wrote: " + detectOutput.getFileName());
-
-            // --- Compare against expected config ---
-            if (Files.exists(expectedFile)) {
-                var expected = mapper.readValue(expectedFile.toFile(), PnpImportFormatConfig.class);
-
-                if (result.isValid() && configsMatch(result.config(), expected)) {
-                    matched++;
-                    System.out.println("  ✓ " + stem + " matches expected config");
+                if (result.isValid()) {
+                    mapper.writeValue(detectOutput.toFile(), result.config());
                 } else {
-                    mismatched++;
-                    var reason = new ArrayList<String>();
-                    if (!result.isValid()) {
-                        reason.addAll(result.errors());
-                    } else {
-                        reason.addAll(findDifferences(result.config(), expected));
-                    }
-                    System.out.println("  ✗ " + stem + " differs from expected config");
-                    for (var r : reason) {
-                        System.out.println("      - " + r);
-                    }
-                    details.add(stem + ": " + String.join("; ", reason));
+                    mapper.writeValue(detectOutput.toFile(), Map.of(
+                            "file", file.getFileName().toString(),
+                            "error", "detection failed",
+                            "details", result.errors()
+                    ));
                 }
-            } else {
-                missingExpected++;
-                System.out.println("  ? " + stem + " — no expected config at " + expectedFile.getFileName());
+                System.out.println("  wrote: " + detectOutput.getFileName());
+
+                // --- Compare against expected config ---
+                if (Files.exists(expectedFile)) {
+                    var expected = mapper.readValue(expectedFile.toFile(), PnpImportFormatConfig.class);
+
+                    if (result.isValid() && configsMatch(result.config(), expected)) {
+                        matched++;
+                        System.out.println("  ✓ " + stem + " matches expected config");
+                    } else if (result.isValid()) {
+                        mismatched++;
+                        var reason = findDifferences(result.config(), expected);
+                        System.out.println("  ✗ " + stem + " differs from expected config");
+                        for (var r : reason) {
+                            System.out.println("      - " + r);
+                        }
+                        details.add(stem + ": " + String.join("; ", reason));
+                    } else {
+                        mismatched++;
+                        System.out.println("  ✗ " + stem + " — detection failed");
+                        details.add(stem + ": detection failed: " + result.errors());
+                    }
+                } else {
+                    missingExpected++;
+                    System.out.println("  ? " + stem + " — no expected config at " + expectedFile.getFileName());
+                }
+            } catch (Exception e) {
+                errors++;
+                System.out.println("  ! " + stem + " — error: " + e.getMessage());
+                try {
+                    mapper.writeValue(detectOutput.toFile(), Map.of(
+                            "file", file.getFileName().toString(),
+                            "error", e.getMessage()
+                    ));
+                } catch (Exception ignored) {
+                }
             }
 
             System.out.println();
@@ -120,18 +145,50 @@ class ExampleOutputGeneratorTest {
         System.out.println("  ✓  " + matched + " matched expected config");
         System.out.println("  ✗  " + mismatched + " differed from expected config");
         System.out.println("  ?  " + missingExpected + " had no expected config");
+        System.out.println("  !  " + errors + " errors during detection");
         System.out.println("Output files in: " + OUTPUT_DIR);
+    }
 
-        // Don't fail the test — this is a verification tool.
-        // Mismatches are expected while using StubLlmClient.
-        System.out.println("\nNote: Mismatches are expected in Stage 2 (StubLlmClient).");
-        System.out.println("These comparisons will become meaningful in Stage 3 (real LLM).");
+    private static LlmClient createStubClient() {
+        var stubJson = """
+                {
+                  "schemaVersion": 1,
+                  "confidence": 0.85,
+                  "delimiter": ",",
+                  "quoteChar": "\\"",
+                  "encoding": "UTF-8",
+                  "linesToIgnore": [0, 1, 2],
+                  "headerRowIndex": 3,
+                  "dataStartRowIndex": 4,
+                  "dataEndRowIndex": 7,
+                  "decimalSeparator": ".",
+                  "columns": {
+                    "reference": { "source": "HEADER_NAME", "value": "Designator" },
+                    "partNumber": { "source": "HEADER_NAME", "value": "Comment" },
+                    "jedec": { "source": "HEADER_NAME", "value": "Footprint" },
+                    "x": { "source": "HEADER_NAME", "value": "Mid X" },
+                    "y": { "source": "HEADER_NAME", "value": "Mid Y" },
+                    "angle": { "source": "HEADER_NAME", "value": "Rotation" },
+                    "side": { "source": "HEADER_NAME", "value": "Layer" }
+                  },
+                  "units": { "x": "mm", "y": "mm", "angle": "deg" },
+                  "valueMappings": { "side": { "Top": "Top", "Bottom": "Bottom" } },
+                  "warnings": []
+                }
+                """;
+        return new StubLlmClient(stubJson);
+    }
+
+    private static LlmClient createOllamaClient() {
+        var url = System.getProperty("llm.url", "http://localhost:11434");
+        var model = System.getProperty("llm.model", "qwen2.5:3b");
+        var options = new LlmOptions("ollama", url, model, 0);
+        System.out.println("  Ollama: " + url + ", model: " + model);
+        return new OllamaLlmClient(options);
     }
 
     /**
-     * Check whether two configs are semantically "close enough".
-     * For Stage 2, we accept any valid config since the stub is a placeholder.
-     * In Stage 3+, this should be tightened.
+     * Check whether two configs match on key fields.
      */
     private static boolean configsMatch(PnpImportFormatConfig actual, PnpImportFormatConfig expected) {
         return actual.delimiter().equals(expected.delimiter())
@@ -188,34 +245,5 @@ class ExampleOutputGeneratorTest {
     private static String stemName(String filename) {
         int dot = filename.lastIndexOf('.');
         return (dot > 0) ? filename.substring(0, dot) : filename;
-    }
-
-    private static String createDefaultStubJson() {
-        return """
-                {
-                  "schemaVersion": 1,
-                  "confidence": 0.85,
-                  "delimiter": ",",
-                  "quoteChar": "\\"",
-                  "encoding": "UTF-8",
-                  "linesToIgnore": [0, 1, 2],
-                  "headerRowIndex": 3,
-                  "dataStartRowIndex": 4,
-                  "dataEndRowIndex": 7,
-                  "decimalSeparator": ".",
-                  "columns": {
-                    "reference": { "source": "HEADER_NAME", "value": "Designator" },
-                    "partNumber": { "source": "HEADER_NAME", "value": "Comment" },
-                    "jedec": { "source": "HEADER_NAME", "value": "Footprint" },
-                    "x": { "source": "HEADER_NAME", "value": "Mid X" },
-                    "y": { "source": "HEADER_NAME", "value": "Mid Y" },
-                    "angle": { "source": "HEADER_NAME", "value": "Rotation" },
-                    "side": { "source": "HEADER_NAME", "value": "Layer" }
-                  },
-                  "units": { "x": "mm", "y": "mm", "angle": "deg" },
-                  "valueMappings": { "side": { "Top": "Top", "Bottom": "Bottom" } },
-                  "warnings": []
-                }
-                """;
     }
 }

@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run detect ollama simple-pnp.csv" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="com.example.pnp.Main" />
+    <module name="pnp-csv-sampler" />
+    <option name="PROGRAM_PARAMETERS" value="detect examples/simple-pnp.csv --llm-provider ollama --llm-url http://localhost:11434 --llm-model qwen2.5:3b --llm-temperature 0" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

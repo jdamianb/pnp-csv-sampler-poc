@@ -4,24 +4,25 @@
 
 A pipeline that receives a `CsvSample` (from the Stage 1 sampler), builds a prompt for an LLM, parses the LLM's JSON response into a `PnpImportFormatConfig`, validates it, and outputs the proposed import configuration.
 
-The first implementation uses a deterministic `StubLlmClient`. Real LLM calls are deferred to Stage 3.
+Stage 2 implemented a deterministic `StubLlmClient`. Stage 3 adds a real LLM adapter for Ollama while preserving the stub as the default.
 
 ## Status
 
-✅ Implemented, tested, reviewed, and approved (Stage 2 — Stub).
+✅ Stage 2 (Stub): Implemented, tested, reviewed, and approved.
+✅ Stage 3 (Ollama): Implemented, tested, reviewed, and approved.
 
 ## Architecture
 
 ```
-CLI: detect <file>
+CLI: detect <file> [--llm-provider ...]
   │
   ├── Sampler (Stage 1) → SampleResult
   │
   ├── FormatDetectionPromptBuilder → prompt string
   │
-  ├── LlmClient (interface)
-  │     └── StubLlmClient (Stage 2)
-  │         └── (Real LLM adapter in Stage 3)
+  ├── LlmClientFactory
+  │     ├── provider=null/blank → StubLlmClient (default)
+  │     └── provider="ollama"   → OllamaLlmClient
   │
   ├── Detector orchestrator
   │     ├── Builds prompt
@@ -29,7 +30,7 @@ CLI: detect <file>
   │     ├── Parses JSON → PnpImportFormatConfig
   │     └── Validates config
   │
-  └── Output: config JSON (or validation errors)
+  └── Output: config JSON (or validation/LLM errors)
 ```
 
 ## Source Files
@@ -44,7 +45,11 @@ CLI: detect <file>
 | `FormatDetectionPromptBuilder.java` | 100 | Builds prompt from `SampleResult` |
 | `PnpImportFormatConfigValidator.java` | 121 | 12 validation rules |
 | `Detector.java` | 82 | Orchestrator: prompt → LLM → parse → validate |
-| `Main.java` (modified) | 202 | Added `detect <file>` CLI command |
+| `Main.java` (modified) | 304 | CLI: `detect` with `--llm-*` flags + env var support |
+| `LlmOptions.java` | 31 | Provider config: provider, baseUrl, model, temperature |
+| `OllamaLlmClient.java` | 136 | Real LLM client using Java `HttpClient` |
+| `LlmException.java` | 18 | Runtime exception for LLM errors |
+| `LlmClientFactory.java` | 48 | Factory: stub by default, Ollama when configured |
 
 ## PnpImportFormatConfig Schema
 
@@ -89,11 +94,27 @@ CLI: detect <file>
 java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar examples/simple-pnp.csv
 java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar sample examples/simple-pnp.csv
 
-# New detect mode
+# Detect with stub (default — no LLM required)
 java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv
 
-# Detect with custom sample sizes
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv --first 40 --last 10
+# Detect with Ollama (real LLM analysis)
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv \
+  --llm-provider ollama \
+  --llm-url http://localhost:11434 \
+  --llm-model qwen2.5:3b
+
+# Detect with Ollama using environment variables
+PNP_LLM_PROVIDER=ollama PNP_LLM_BASE_URL=http://localhost:11434 \
+PNP_LLM_MODEL=qwen2.5:3b \
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv
+
+# Detect with custom sample sizes and LLM flags
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv \
+  --first 40 --last 10 \
+  --llm-provider ollama \
+  --llm-url http://localhost:11434 \
+  --llm-model qwen2.5:3b \
+  --llm-temperature 0
 ```
 
 ## Example Output
@@ -135,10 +156,28 @@ $ java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp
 - **Interface over abstract class**: `LlmClient` is a single-method interface — minimal contract, easy to implement
 - **Detector orchestrator**: Single entry point for the 5-step pipeline, testable via constructor injection
 - **R10 dedup preserved**: The sampler's dedup rule (no overlapping lines) is inherited from Stage 1
+- **Java HttpClient**: Uses Java's built-in `java.net.http.HttpClient` — zero new dependencies for Stage 3
+- **Factory pattern**: `LlmClientFactory` encapsulates provider selection logic, easy to extend with new providers
+- **CLI args > env vars**: CLI flags override environment variables for explicit per-invocation control
+- **Temperature 0**: Default temperature ensures deterministic LLM output for configuration detection
+- **Stub as default**: If no provider is configured, `detect` uses `StubLlmClient` — works offline
 
 ## Verification Tool
 
 The `ExampleOutputGeneratorTest` processes all files in `examples-extended/` and:
 1. Generates sample + detect JSON outputs in `target/example-outputs/`
 2. Compares detect output against expected configs in `expected-configs/`
-3. Reports matches/mismatches without failing the test (mismatches expected in Stage 2)
+3. Reports matches/mismatches without failing the test
+
+To run with the stub (default):
+```bash
+mvn test -Dtest=ExampleOutputGeneratorTest
+```
+
+To run with Ollama for real LLM analysis:
+```bash
+mvn test -Dtest=ExampleOutputGeneratorTest \
+  -Dllm.integration=true \
+  -Dllm.url=http://localhost:11434 \
+  -Dllm.model=qwen2.5:3b
+```

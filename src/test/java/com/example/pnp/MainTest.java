@@ -205,4 +205,90 @@ class MainTest {
         }
         return sb.toString();
     }
+
+    // ============================================================
+    //  Stage 3: --llm-* flags
+    // ============================================================
+
+    @Test
+    void detectWithOllamaFlagsFailsConnection() throws IOException {
+        var file = createTempFile("data\n");
+        var exitCode = Main.run(new String[]{
+                "detect", file.toString(),
+                "--llm-provider", "ollama",
+                "--llm-url", "http://localhost:18765",
+                "--llm-model", "test-model"
+        });
+        assertEquals(1, exitCode);
+    }
+
+    @Test
+    void detectWithoutLlmFlagsUsesStub() throws IOException {
+        var file = createTempFile("header\nR1,10k\n");
+        var exitCode = Main.run(new String[]{"detect", file.toString()});
+        assertEquals(0, exitCode);
+    }
+
+    @Test
+    void detectWithUnknownProvider() throws IOException {
+        var file = createTempFile("data\n");
+        var exitCode = Main.run(new String[]{
+                "detect", file.toString(),
+                "--llm-provider", "unknown-provider"
+        });
+        assertEquals(1, exitCode);
+    }
+
+    @Test
+    void llmFlagsInSampleModeAllowed() throws IOException {
+        var file = createTempFile("line1\nline2\n");
+        var exitCode = Main.run(new String[]{
+                "sample", file.toString(),
+                "--llm-provider", "ollama"
+        });
+        assertEquals(0, exitCode);
+    }
+
+    @Test
+    void detectWithInvalidTemperature() throws IOException {
+        var file = createTempFile("data\n");
+        var exitCode = Main.run(new String[]{
+                "detect", file.toString(),
+                "--llm-temperature", "abc"
+        });
+        assertEquals(1, exitCode);
+    }
+
+    @Test
+    void detectWithMissingProviderValue() throws IOException {
+        var file = createTempFile("data\n");
+        var exitCode = Main.run(new String[]{
+                "detect", file.toString(),
+                "--llm-provider"
+        });
+        assertEquals(1, exitCode);
+    }
+
+    @Test
+    void detectWithMissingUrlValue() throws IOException {
+        var file = createTempFile("data\n");
+        var exitCode = Main.run(new String[]{
+                "detect", file.toString(),
+                "--llm-provider", "ollama",
+                "--llm-url"
+        });
+        assertEquals(1, exitCode);
+    }
+
+    @Test
+    void detectWithMissingModelValue() throws IOException {
+        var file = createTempFile("data\n");
+        var exitCode = Main.run(new String[]{
+                "detect", file.toString(),
+                "--llm-provider", "ollama",
+                "--llm-url", "http://localhost:11434",
+                "--llm-model"
+        });
+        assertEquals(1, exitCode);
+    }
 }

@@ -11,9 +11,13 @@
 | DetectorTest | `DetectorTest.java` | 4 | Orchestrator: valid/invalid stub, parse error, integration |
 | MainTest (detect additions) | `MainTest.java` | 5 | CLI detect command: valid, error, flags, missing file |
 | ExampleOutputGeneratorTest | `ExampleOutputGeneratorTest.java` | 1 | Processes all 12 extended examples, compares vs expected |
-| **Stage 2 subtotal** | **7 suites** | **46** | |
-| Stage 1 (existing) | 2 suites | 31 | Preserved unchanged |
-| **Total** | **9 suites** | **77** | |
+| LlmOptionsTest | `LlmOptionsTest.java` | 8 | Provider config validation |
+| LlmClientFactoryTest | `LlmClientFactoryTest.java` | 7 | Factory: stub/ollama/unknown/blank |
+| OllamaLlmClientTest | `OllamaLlmClientTest.java` | 6 | Offline error paths: connection refused, constructor validation |
+| OllamaIntegrationTest | `OllamaIntegrationTest.java` | 3 | Opt-in: real Ollama interaction (requires `-Dllm.integration=true`) |
+| MainTest (Stage 3 additions) | `MainTest.java` | 8 | CLI: `--llm-*` flags, unknown provider, missing values |
+| **Stage 3 subtotal** | **5 suites** | **32** | |
+| **Total** | **14 suites** | **109** | **(+3 skipped = integration)** |
 
 ## How to Run
 
@@ -97,16 +101,45 @@ java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar sample examples/simple-pnp.c
 The `ExampleOutputGeneratorTest` processes all 12 files in `examples-extended/`:
 
 ```bash
+# Default: uses StubLlmClient
 mvn test -Dtest=ExampleOutputGeneratorTest
+
+# With real LLM (requires Ollama running)
+mvn test -Dtest=ExampleOutputGeneratorTest \
+  -Dllm.integration=true \
+  -Dllm.url=http://localhost:11434 \
+  -Dllm.model=qwen2.5:3b
 ```
 
 This generates 24 output files in `target/example-outputs/` (12 sample + 12 detect) and compares detect results against expected configs in `expected-configs/`.
 
-Differences are expected in Stage 2 because `StubLlmClient` returns a hardcoded config that doesn't analyze the actual file. These comparisons will become meaningful in Stage 3 (real LLM).
+With the stub, all 12 files will differ from expected configs. With Ollama, a subset will match depending on model quality.
 
-## Known Limitations
+## Known Limitations (Stage 2 — Stub only)
 
 - `StubLlmClient` returns the same hardcoded config for all files — format detection is not actually performed
-- The `detect` command is functional but produces the same output regardless of input file content
-- No real LLM adapter is implemented yet (Stage 3)
-- The whitespace-delimited file format (`.pos` files like `01_kicad`) is not handled — the stub always returns `","` as delimiter
+- The whitespace-delimited file format (`.pos` files like `01_kicad`) is not handled by the stub
+
+## Stage 3 — Real LLM Adapter (Ollama)
+
+These limitations are resolved when using Ollama:
+- ✅ `OllamaLlmClient` analyzes each file and produces a file-specific config
+- ✅ Whitespace-delimited files (`.pos`) are correctly analyzed
+- ✅ Tab-delimited files (`.tsv`) are correctly analyzed
+- ✅ Semicolon-delimited with decimal comma (European format) is correctly analyzed
+- ✅ No-header files are correctly detected
+
+## Opt-in Integration Tests
+
+Real LLM tests are gated behind `-Dllm.integration=true`:
+
+```bash
+# Run integration tests (requires Ollama running)
+mvn test -Dllm.integration=true
+
+# Run example output generation with Ollama
+mvn test -Dtest=ExampleOutputGeneratorTest \
+  -Dllm.integration=true \
+  -Dllm.url=http://localhost:11434 \
+  -Dllm.model=qwen2.5:3b
+```

@@ -137,6 +137,13 @@ Feature documentation is stored under `docs/` with the feature name as the file 
 - `docs/testing/llm-assisted-pnp-format-detection.md` — test strategy and coverage
 - `expected-configs/` — expected config JSONs for example files
 
+### Stage 3 — Real LLM Adapter
+
+- `docs/feature-requests/stage3-real-llm-adapter.md` — feature request
+- `docs/specs/stage3-real-llm-adapter-spec.md` — EARS requirements and Gherkin scenarios
+- `docs/features/llm-assisted-pnp-format-detection.md` — feature documentation (Stage 2+3 combined)
+- `docs/testing/llm-assisted-pnp-format-detection.md` — test strategy and coverage (Stage 2+3 combined)
+
 Agents should read the relevant docs before working on a feature.
 
 ## PoC stages

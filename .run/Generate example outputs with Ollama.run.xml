@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Generate example outputs with Ollama" type="JUnit" factoryName="JUnit">
+    <module name="pnp-csv-sampler" />
+    <option name="MAIN_CLASS_NAME" value="com.example.pnp.ExampleOutputGeneratorTest" />
+    <option name="METHOD_NAME" value="" />
+    <option name="TEST_OBJECT" value="class" />
+    <option name="VM_PARAMETERS" value="-Dllm.integration=true -Dllm.url=http://localhost:11434 -Dllm.model=qwen2.5:3b" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
