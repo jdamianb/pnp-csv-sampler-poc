@@ -1,56 +1,111 @@
-# PnP Goose PoC Harness
+# PnP CSV Sampler — Proof of Concept
 
-This folder contains a lightweight multi-agent harness for a Java 21 Pick-and-Place CSV sampler PoC.
+A deterministic Java 21 CLI tool that reads Pick-and-Place (PnP) CSV files as raw text and produces a structured JSON sample containing the total line count, first N lines, and last M lines — without parsing, inferring, or transforming any content.
 
-Roles:
+## Quick Start
 
-1. Leader / Orchestrator
-2. Spec Writer
-3. Implementer
-4. Reviewer
-5. Doc Writer
+```bash
+# Build
+mvn clean package
 
-## How to use
+# Run on example files
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar examples/simple-pnp.csv
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar examples/messy-pnp.csv
 
-Copy this harness into the root of your PoC repository.
+# Custom sample sizes
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar examples/simple-pnp.csv --first 4 --last 2
 
-Start Goose with:
-
-```text
-Read AGENTS.md and follow the PoC workflow.
-Start as the leader agent.
-Use docs/feature-requests/pnp-csv-sampler-poc.md as the feature request.
-Do not implement code until the spec writer produces EARS and Gherkin specs and I approve them.
+# Run tests
+mvn test
 ```
 
-## Human validation gates
+## Usage
 
-1. Spec approval before implementation starts.
-2. Implementation approval before documentation starts.
-3. Documentation approval before the feature is considered complete.
+```
+Usage: java ... com.example.pnp.Main <file> [--first N] [--last M]
+  <file>        Path to PnP CSV file (required)
+  --first N     Number of lines to sample from the start (default: 80)
+  --last M      Number of lines to sample from the end (default: 20)
 
-## PoC scope
-
-The first implementation should only build:
-
-```text
-CSV file path in
-raw numbered sample JSON out
-Java 21 Maven CLI app
-JUnit tests passing
-Gherkin acceptance scenarios documented, and optionally automated
+Outputs a JSON object with totalLines, firstLines, and lastLines.
 ```
 
-Out of scope:
+## Example Output
 
-```text
-Spring Boot
-LLM calls
-RAG
-database
-web UI
-CSV field parsing
-format detection
-column mapping
-fine-tuning
+```json
+{
+  "totalLines" : 8,
+  "firstLines" : [ {
+    "index" : 0,
+    "text" : "# Pick and Place Export"
+  }, {
+    "index" : 1,
+    "text" : "# Source: Example CAD Tool"
+  } ],
+  "lastLines" : [ ]
+}
 ```
+
+## Project Structure
+
+```
+.
+├── AGENTS.md                         # Multi-agent harness & workflow
+├── .run/                             # IntelliJ run configurations (shareable)
+├── docs/
+│   ├── adr/                          # Architecture Decision Records
+│   ├── feature-requests/
+│   │   └── pnp-csv-sampler-poc.md    # Original feature request
+│   ├── features/                     # Feature documentation
+│   ├── specs/
+│   │   └── pnp-csv-sampler-spec.md   # EARS requirements & Gherkin scenarios
+│   └── testing/                      # Test strategy
+├── examples/
+│   ├── simple-pnp.csv                # Simple example (8 lines)
+│   └── messy-pnp.csv                 # Messy example (13 lines)
+├── .goose/
+│   ├── handoffs/                     # Phase transition handoffs
+│   ├── reviews/                      # Code review reports
+│   └── roles/                        # Role definitions
+├── src/
+│   ├── main/java/com/example/pnp/
+│   │   ├── Main.java                 # CLI entry point
+│   │   ├── Sampler.java              # Core sampling logic
+│   │   ├── Line.java                 # Line record (index + text)
+│   │   └── SampleResult.java         # Result record (totalLines, firstLines, lastLines)
+│   └── test/java/com/example/pnp/
+│       ├── SamplerTest.java          # 19 unit tests
+│       └── MainTest.java             # 12 CLI tests
+└── pom.xml                           # Maven build (Java 21, Jackson, JUnit 5)
+```
+
+## Core Design
+
+| Principle | Implementation |
+|---|---|
+| **Dumb & deterministic** | Reads raw lines, no CSV parsing, no inference, no trimming |
+| **Streaming** | Ring buffer for tail — memory proportional to sample size, not file size |
+| **No duplicates** | Lines overlapping between first and last samples appear only once (R10) |
+| **Testable** | `Sampler` accepts `Reader` — tests don't need filesystem |
+| **JSON output** | Jackson with pretty-print to stdout |
+
+## Out of Scope
+
+This PoC intentionally excludes: CSV parsing, delimiter/header/column inference, unit detection, line normalization, LLM calls, Spring Boot, REST API, database, and UI.
+
+## Build Requirements
+
+- Java 21+
+- Maven 3.8+
+
+## Multi-Agent Workflow
+
+This project was built using a role-based Goose agent harness. See `AGENTS.md` for the full workflow definition.
+
+The phases were:
+
+1. **Leader** — intake feature request, hand off to spec writer
+2. **Spec Writer** — EARS requirements + Gherkin scenarios
+3. **Implementer** — Java 21 + Maven + Jackson + JUnit 5
+4. **Reviewer** — code quality, scope compliance, test coverage
+5. **Doc Writer** — documentation updates

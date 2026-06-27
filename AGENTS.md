@@ -35,6 +35,18 @@ It must not:
 - call any LLM API
 - use Spring Boot
 
+## Documentation reference
+
+Feature documentation is stored under `docs/` with the feature name as the file name.
+
+- `docs/feature-requests/pnp-csv-sampler-poc.md` — original feature request
+- `docs/specs/pnp-csv-sampler-spec.md` — EARS requirements and Gherkin scenarios
+- `docs/features/pnp-csv-sampler.md` — implemented feature documentation
+- `docs/adr/pnp-csv-sampler.md` — Architecture Decision Records
+- `docs/testing/pnp-csv-sampler.md` — test strategy and coverage
+
+Agents should read the relevant docs before working on a feature.
+
 ## Roles
 
 Role definitions are stored under `.goose/roles/`.
