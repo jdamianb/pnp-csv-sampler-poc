@@ -1,0 +1,13 @@
+Job Name: BOARD-1234
+Generated: 2026-06-27
+Machine: Synthetic-PnP-9000
+Coordinate Unit: millimeter
+
+No.;RefDes;PartNo;Package;X-Pos;Y-Pos;Angle;MountSide;Feeder
+1;R1;RES-10K-0603;0603;12,500;33,100;90;T;F01
+2;C1;CAP-100N-0402;0402;14,800;31,900;180;T;F02
+3;U1;STM32F103C8T6;LQFP-48;40,000;25,000;0;T;TRAY1
+4;D1;LED-RED-0603;0603;8,250;10,500;270;B;F08
+
+Total placements: 4
+End of file

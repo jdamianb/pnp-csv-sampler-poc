@@ -1,0 +1,9 @@
+Recipe,DemoBoard-A
+Units,mm
+BoardOrigin,Auxiliary
+
+PlacementNo,Ref,ComponentID,Value,Package,X(mm),Y(mm),R(deg),Side,Feeder,Nozzle,Speed
+1,R1,RES-10K-0603,10k,0603,12.500,33.100,90,Top,F01,N1,Normal
+2,C1,CAP-100N-0402,100n,0402,14.800,31.900,180,Top,F02,N2,Normal
+3,U1,STM32F103C8T6,STM32F103,LQFP-48,40.000,25.000,0,Top,TRAY1,N5,Slow
+4,D1,LED-RED-0603,LED RED,0603,8.250,10.500,270,Bottom,F08,N1,Normal

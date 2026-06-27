@@ -1,0 +1,9 @@
+# Program: DEMO_PANEL_A
+# Units: mm
+# Angle: deg
+# Coordinates: board origin lower left
+Index	Designator	PN	JEDEC	CenterX	CenterY	Theta	BoardSide	Nozzle
+1	R1	RES-10K-0603	0603	12.500	33.100	90	TOP	N1
+2	C1	CAP-100N-0402	0402	14.800	31.900	180	TOP	N2
+3	U1	STM32F103C8T6	LQFP-48	40.000	25.000	0	TOP	N5
+4	D1	LED-RED-0603	0603	8.250	10.500	270	BOTTOM	N1

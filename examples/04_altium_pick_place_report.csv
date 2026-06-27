@@ -1,0 +1,5 @@
+Designator,Footprint,Mid X,Mid Y,Ref X,Ref Y,Pad X,Pad Y,Layer,Rotation,Comment
+C1,C_0603_1608Metric,36.900mm,28.500mm,,,,,Top,90,100n
+R1,R_0603_1608Metric,40.125mm,30.250mm,,,,,Top,180,10k
+U1,LQFP-48_7x7mm,55.000mm,42.000mm,,,,,Top,0,STM32F103C8T6
+D1,LED_0603_1608Metric,20.500mm,15.200mm,,,,,Bottom,270,LED RED
