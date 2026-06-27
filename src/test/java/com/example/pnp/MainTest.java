@@ -150,6 +150,43 @@ class MainTest {
     }
 
     // ============================================================
+    //  Stage 2: detect command
+    // ============================================================
+
+    @Test
+    void detectCommandReturnsZero() throws IOException {
+        var file = createTempFile("header\nR1,10k,0603\n");
+        var exitCode = Main.run(new String[]{"detect", file.toString()});
+        assertEquals(0, exitCode);
+    }
+
+    @Test
+    void detectCommandWithCustomFlags() throws IOException {
+        var file = createTempFile(generateLines(10));
+        var exitCode = Main.run(new String[]{"detect", file.toString(), "--first", "5", "--last", "2"});
+        assertEquals(0, exitCode);
+    }
+
+    @Test
+    void detectCommandFileNotFound() throws IOException {
+        var exitCode = Main.run(new String[]{"detect", "/nonexistent/detect-test.csv"});
+        assertEquals(1, exitCode);
+    }
+
+    @Test
+    void detectCommandMissingFileArg() throws IOException {
+        var exitCode = Main.run(new String[]{"detect"});
+        assertEquals(1, exitCode);
+    }
+
+    @Test
+    void sampleCommandExplicit() throws IOException {
+        var file = createTempFile("line1\nline2\n");
+        var exitCode = Main.run(new String[]{"sample", file.toString()});
+        assertEquals(0, exitCode);
+    }
+
+    // ============================================================
     // Helpers
     // ============================================================
 
