@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "confidence": 0.92,
+  "delimiter": ";",
+  "quoteChar": "\"",
+  "encoding": "UTF-8",
+  "linesToIgnore": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    10,
+    11
+  ],
+  "headerRowIndex": 5,
+  "dataStartRowIndex": 6,
+  "dataEndRowIndex": 9,
+  "decimalSeparator": ",",
+  "columns": {
+    "reference": {
+      "source": "HEADER_NAME",
+      "value": "RefDes"
+    },
+    "partNumber": {
+      "source": "HEADER_NAME",
+      "value": "PartNo"
+    },
+    "jedec": {
+      "source": "HEADER_NAME",
+      "value": "Package"
+    },
+    "x": {
+      "source": "HEADER_NAME",
+      "value": "X-Pos"
+    },
+    "y": {
+      "source": "HEADER_NAME",
+      "value": "Y-Pos"
+    },
+    "angle": {
+      "source": "HEADER_NAME",
+      "value": "Angle"
+    },
+    "side": {
+      "source": "HEADER_NAME",
+      "value": "MountSide"
+    }
+  },
+  "units": {
+    "x": "mm",
+    "y": "mm",
+    "angle": "deg"
+  },
+  "valueMappings": {
+    "side": {
+      "T": "Top",
+      "B": "Bottom"
+    }
+  },
+  "warnings": []
+}

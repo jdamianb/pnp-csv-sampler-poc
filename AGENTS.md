@@ -116,6 +116,29 @@ Unit tests must not require:
 
 Real LLM tests must be opt-in integration tests.
 
+## Documentation reference
+
+Feature documentation is stored under `docs/` with the feature name as the file name.
+
+### Stage 1 — CSV Sampler
+
+- `docs/feature-requests/pnp-csv-sampler-poc.md` — original feature request
+- `docs/specs/pnp-csv-sampler-spec.md` — EARS requirements and Gherkin scenarios
+- `docs/features/pnp-csv-sampler.md` — implemented feature documentation
+- `docs/adr/pnp-csv-sampler.md` — Architecture Decision Records (5 ADRs)
+- `docs/testing/pnp-csv-sampler.md` — test strategy and coverage
+
+### Stage 2 — LLM-assisted Format Detection
+
+- `docs/feature-requests/llm-assisted-pnp-format-detection.md` — feature request
+- `docs/specs/llm-assisted-pnp-format-detection-spec.md` — EARS requirements and Gherkin scenarios
+- `docs/features/llm-assisted-pnp-format-detection.md` — implemented feature documentation
+- `docs/adr/0002-llm-as-pnp-import-configuration-assistant.md` — ADR for LLM role
+- `docs/testing/llm-assisted-pnp-format-detection.md` — test strategy and coverage
+- `expected-configs/` — expected config JSONs for example files
+
+Agents should read the relevant docs before working on a feature.
+
 ## PoC stages
 
 The project may evolve through these stages.

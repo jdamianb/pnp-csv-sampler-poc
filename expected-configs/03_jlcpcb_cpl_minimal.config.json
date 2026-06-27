@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "confidence": 0.95,
+  "delimiter": ",",
+  "quoteChar": "\"",
+  "encoding": "UTF-8",
+  "linesToIgnore": [],
+  "headerRowIndex": 0,
+  "dataStartRowIndex": 1,
+  "dataEndRowIndex": 4,
+  "decimalSeparator": ".",
+  "columns": {
+    "reference": {
+      "source": "HEADER_NAME",
+      "value": "Designator"
+    },
+    "x": {
+      "source": "HEADER_NAME",
+      "value": "Mid X"
+    },
+    "y": {
+      "source": "HEADER_NAME",
+      "value": "Mid Y"
+    },
+    "angle": {
+      "source": "HEADER_NAME",
+      "value": "Rotation"
+    },
+    "side": {
+      "source": "HEADER_NAME",
+      "value": "Layer"
+    }
+  },
+  "units": {
+    "x": "mm",
+    "y": "mm",
+    "angle": "deg"
+  },
+  "valueMappings": {
+    "side": {
+      "Top": "Top",
+      "Bottom": "Bottom"
+    }
+  },
+  "warnings": [
+    "No part number or JEDEC/package column in CPL-only file."
+  ]
+}

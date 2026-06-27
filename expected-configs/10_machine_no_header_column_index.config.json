@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "confidence": 0.82,
+  "delimiter": ",",
+  "quoteChar": "\"",
+  "encoding": "UTF-8",
+  "linesToIgnore": [
+    0,
+    1
+  ],
+  "headerRowIndex": null,
+  "dataStartRowIndex": 2,
+  "dataEndRowIndex": 5,
+  "decimalSeparator": ".",
+  "columns": {
+    "reference": {
+      "source": "COLUMN_INDEX",
+      "value": "1"
+    },
+    "partNumber": {
+      "source": "COLUMN_INDEX",
+      "value": "2"
+    },
+    "jedec": {
+      "source": "COLUMN_INDEX",
+      "value": "3"
+    },
+    "x": {
+      "source": "COLUMN_INDEX",
+      "value": "4"
+    },
+    "y": {
+      "source": "COLUMN_INDEX",
+      "value": "5"
+    },
+    "angle": {
+      "source": "COLUMN_INDEX",
+      "value": "6"
+    },
+    "side": {
+      "source": "COLUMN_INDEX",
+      "value": "7"
+    }
+  },
+  "units": {
+    "x": "mm",
+    "y": "mm",
+    "angle": "deg"
+  },
+  "valueMappings": {
+    "side": {
+      "T": "Top",
+      "B": "Bottom"
+    }
+  },
+  "warnings": [
+    "Header row is absent; mappings use zero-based column indexes."
+  ]
+}

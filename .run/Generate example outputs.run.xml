@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Generate example outputs" type="JUnit" factoryName="JUnit">
+    <module name="pnp-csv-sampler" />
+    <option name="MAIN_CLASS_NAME" value="com.example.pnp.ExampleOutputGeneratorTest" />
+    <option name="METHOD_NAME" value="generateAndCompareAll" />
+    <option name="TEST_OBJECT" value="method" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

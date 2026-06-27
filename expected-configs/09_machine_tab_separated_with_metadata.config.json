@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "confidence": 0.92,
+  "delimiter": "\\t",
+  "quoteChar": "\"",
+  "encoding": "UTF-8",
+  "linesToIgnore": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "headerRowIndex": 4,
+  "dataStartRowIndex": 5,
+  "dataEndRowIndex": 8,
+  "decimalSeparator": ".",
+  "columns": {
+    "reference": {
+      "source": "HEADER_NAME",
+      "value": "Designator"
+    },
+    "partNumber": {
+      "source": "HEADER_NAME",
+      "value": "PN"
+    },
+    "jedec": {
+      "source": "HEADER_NAME",
+      "value": "JEDEC"
+    },
+    "x": {
+      "source": "HEADER_NAME",
+      "value": "CenterX"
+    },
+    "y": {
+      "source": "HEADER_NAME",
+      "value": "CenterY"
+    },
+    "angle": {
+      "source": "HEADER_NAME",
+      "value": "Theta"
+    },
+    "side": {
+      "source": "HEADER_NAME",
+      "value": "BoardSide"
+    }
+  },
+  "units": {
+    "x": "mm",
+    "y": "mm",
+    "angle": "deg"
+  },
+  "valueMappings": {
+    "side": {
+      "TOP": "Top",
+      "BOTTOM": "Bottom"
+    }
+  },
+  "warnings": []
+}

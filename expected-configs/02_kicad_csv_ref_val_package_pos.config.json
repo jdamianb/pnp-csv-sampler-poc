@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "confidence": 0.96,
+  "delimiter": ",",
+  "quoteChar": "\"",
+  "encoding": "UTF-8",
+  "linesToIgnore": [],
+  "headerRowIndex": 0,
+  "dataStartRowIndex": 1,
+  "dataEndRowIndex": 4,
+  "decimalSeparator": ".",
+  "columns": {
+    "reference": {
+      "source": "HEADER_NAME",
+      "value": "Ref"
+    },
+    "partNumber": {
+      "source": "HEADER_NAME",
+      "value": "Val"
+    },
+    "jedec": {
+      "source": "HEADER_NAME",
+      "value": "Package"
+    },
+    "x": {
+      "source": "HEADER_NAME",
+      "value": "PosX"
+    },
+    "y": {
+      "source": "HEADER_NAME",
+      "value": "PosY"
+    },
+    "angle": {
+      "source": "HEADER_NAME",
+      "value": "Rot"
+    },
+    "side": {
+      "source": "HEADER_NAME",
+      "value": "Side"
+    }
+  },
+  "units": {
+    "x": "mm",
+    "y": "mm",
+    "angle": "deg"
+  },
+  "valueMappings": {
+    "side": {
+      "top": "Top",
+      "bottom": "Bottom"
+    }
+  },
+  "warnings": []
+}

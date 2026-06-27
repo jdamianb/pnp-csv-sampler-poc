@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "confidence": 0.7,
+  "delimiter": ",",
+  "quoteChar": "\"",
+  "encoding": "UTF-8",
+  "linesToIgnore": [
+    0,
+    1,
+    2,
+    7
+  ],
+  "headerRowIndex": 3,
+  "dataStartRowIndex": 4,
+  "dataEndRowIndex": 11,
+  "decimalSeparator": ".",
+  "columns": {
+    "reference": {
+      "source": "HEADER_NAME",
+      "value": "Ref"
+    },
+    "partNumber": {
+      "source": "HEADER_NAME",
+      "value": "Part"
+    },
+    "jedec": {
+      "source": "HEADER_NAME",
+      "value": "Package"
+    },
+    "x": {
+      "source": "HEADER_NAME",
+      "value": "X"
+    },
+    "y": {
+      "source": "HEADER_NAME",
+      "value": "Y"
+    },
+    "angle": {
+      "source": "HEADER_NAME",
+      "value": "Angle"
+    }
+  },
+  "units": {
+    "x": "mm",
+    "y": "mm",
+    "angle": "deg"
+  },
+  "valueMappings": {},
+  "warnings": [
+    "Side is encoded by section headers, not by a data column.",
+    "This file may require a future section-aware parser/config extension."
+  ]
+}

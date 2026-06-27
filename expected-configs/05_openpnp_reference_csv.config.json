@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "confidence": 0.94,
+  "delimiter": ",",
+  "quoteChar": "\"",
+  "encoding": "UTF-8",
+  "linesToIgnore": [],
+  "headerRowIndex": 0,
+  "dataStartRowIndex": 1,
+  "dataEndRowIndex": 4,
+  "decimalSeparator": ".",
+  "columns": {
+    "reference": {
+      "source": "HEADER_NAME",
+      "value": "Designator"
+    },
+    "partNumber": {
+      "source": "HEADER_NAME",
+      "value": "Part"
+    },
+    "jedec": {
+      "source": "HEADER_NAME",
+      "value": "Package"
+    },
+    "x": {
+      "source": "HEADER_NAME",
+      "value": "X(mm)"
+    },
+    "y": {
+      "source": "HEADER_NAME",
+      "value": "Y(mm)"
+    },
+    "angle": {
+      "source": "HEADER_NAME",
+      "value": "Rotation"
+    },
+    "side": {
+      "source": "HEADER_NAME",
+      "value": "Side"
+    }
+  },
+  "units": {
+    "x": "mm",
+    "y": "mm",
+    "angle": "deg"
+  },
+  "valueMappings": {
+    "side": {
+      "T": "Top",
+      "B": "Bottom"
+    }
+  },
+  "warnings": []
+}

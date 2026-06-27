@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "confidence": 0.9,
+  "delimiter": ",",
+  "quoteChar": "\"",
+  "encoding": "UTF-8",
+  "linesToIgnore": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "headerRowIndex": 4,
+  "dataStartRowIndex": 5,
+  "dataEndRowIndex": 8,
+  "decimalSeparator": ".",
+  "columns": {
+    "reference": {
+      "source": "HEADER_NAME",
+      "value": "Ref"
+    },
+    "partNumber": {
+      "source": "HEADER_NAME",
+      "value": "ComponentID"
+    },
+    "jedec": {
+      "source": "HEADER_NAME",
+      "value": "Package"
+    },
+    "x": {
+      "source": "HEADER_NAME",
+      "value": "X(mm)"
+    },
+    "y": {
+      "source": "HEADER_NAME",
+      "value": "Y(mm)"
+    },
+    "angle": {
+      "source": "HEADER_NAME",
+      "value": "R(deg)"
+    },
+    "side": {
+      "source": "HEADER_NAME",
+      "value": "Side"
+    }
+  },
+  "units": {
+    "x": "mm",
+    "y": "mm",
+    "angle": "deg"
+  },
+  "valueMappings": {
+    "side": {
+      "Top": "Top",
+      "Bottom": "Bottom"
+    }
+  },
+  "warnings": [
+    "Extra feeder/nozzle/speed columns are intentionally ignored by the minimal config."
+  ]
+}

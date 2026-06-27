@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (Stage 2 — stub implementation complete)
 
 ## Context
 

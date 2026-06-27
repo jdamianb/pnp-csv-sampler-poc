@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "confidence": 0.9,
+  "delimiter": "WHITESPACE",
+  "quoteChar": null,
+  "encoding": "UTF-8",
+  "linesToIgnore": [
+    0,
+    1,
+    2,
+    8
+  ],
+  "headerRowIndex": 3,
+  "dataStartRowIndex": 4,
+  "dataEndRowIndex": 7,
+  "decimalSeparator": ".",
+  "columns": {
+    "reference": {
+      "source": "HEADER_NAME",
+      "value": "Ref"
+    },
+    "partNumber": {
+      "source": "HEADER_NAME",
+      "value": "Val"
+    },
+    "jedec": {
+      "source": "HEADER_NAME",
+      "value": "Package"
+    },
+    "x": {
+      "source": "HEADER_NAME",
+      "value": "PosX"
+    },
+    "y": {
+      "source": "HEADER_NAME",
+      "value": "PosY"
+    },
+    "angle": {
+      "source": "HEADER_NAME",
+      "value": "Rot"
+    },
+    "side": {
+      "source": "HEADER_NAME",
+      "value": "Side"
+    }
+  },
+  "units": {
+    "x": "mm",
+    "y": "mm",
+    "angle": "deg"
+  },
+  "valueMappings": {
+    "side": {
+      "top": "Top",
+      "bottom": "Bottom"
+    }
+  },
+  "warnings": [
+    "Whitespace-delimited file, not comma CSV."
+  ]
+}
