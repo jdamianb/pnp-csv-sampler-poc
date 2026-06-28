@@ -197,6 +197,13 @@ Feature documentation is stored under `docs/` with the feature name as the file 
 - `docs/features/separator-detection-improvement.md`
 - `docs/testing/separator-detection-improvement.md`
 
+### Model Comparison for 4 GB VRAM
+
+- `prompt-model-comparison-4gb-vram.md` — original prompt
+- `docs/specs/model-comparison-4gb-vram-spec.md`
+- `scripts/evaluate-ollama-models.sh` — comparison script
+- `README.md` — model comparison section with install/running instructions
+
 Agents should read the relevant docs before working on a feature.
 
 ## PoC stages

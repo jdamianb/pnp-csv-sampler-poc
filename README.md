@@ -242,6 +242,78 @@ The results are injected into both the detection prompt and the repair prompt. T
 
 **161 tests total** (158 deterministic, 3 opt-in integration) — no network required for default run.
 
+## Model comparison (4 GB VRAM)
+
+The PoC supports testing small Ollama models on a laptop with 4 GB VRAM. The primary recommendation for structured JSON/config tasks is `qwen2.5-coder:3b`.
+
+### Install candidate models
+
+```bash
+ollama pull qwen2.5-coder:3b     # Primary: best for strict JSON/config generation
+ollama pull llama3.2:3b          # Comparison: general instruction baseline
+ollama pull phi4-mini            # Comparison: compact reasoning/instruction model
+ollama pull gemma3:4b            # Comparison: slightly larger, may be slower on 4 GB
+```
+
+### Run evaluation with a specific model
+
+Set environment variables:
+```bash
+export PNP_LLM_PROVIDER=ollama
+export PNP_LLM_BASE_URL=http://localhost:11434
+export PNP_LLM_MODEL=qwen2.5-coder:3b
+export PNP_LLM_TEMPERATURE=0
+bash scripts/run-evaluation.sh
+```
+
+Or pass model as argument:
+```bash
+bash scripts/run-evaluation.sh http://localhost:11434 qwen2.5-coder:3b
+```
+
+### Compare all models
+
+```bash
+bash scripts/evaluate-ollama-models.sh
+```
+
+This evaluates 4 models in sequence and saves per-model reports to `target/evaluation-reports/evaluation-<model>.json`.
+
+### Scripts
+
+| Script | Purpose |
+|---|---|
+| `scripts/run-evaluation.sh` | Evaluate a single model (default or specified) |
+| `scripts/evaluate-ollama-models.sh` | Compare all 4 candidate models |
+
+### IntelliJ Configurations
+
+| Configuration | Command |
+|---|---|
+| `Run all model comparisons` | `scripts/evaluate-ollama-models.sh` |
+| `Run evaluation (qwen2.5-coder:3b)` | `scripts/run-evaluation.sh http://localhost:11434 qwen2.5-coder:3b` |
+| `Run evaluation (Ollama)` | `scripts/run-evaluation.sh http://localhost:11434 qwen2.5:3b` |
+| `Run evaluation (stub)` | `scripts/run-evaluation.sh` |
+
+### Metrics compared per model
+
+| Metric | Description |
+|---|---|
+| Valid JSON | Percentage of files with valid LLM JSON response |
+| Validator Pass | Percentage of files passing PnpImportFormatConfigValidator |
+| Parser Success | Percentage of files where detected config matches expected |
+| Config Accuracy | Percentage matching expected-configs/ |
+| Repair Effectiveness | Percentage of repair attempts converting failures to successes |
+
+### Model selection rule
+
+After running the comparison, select the default model by priority:
+1. Highest parser success
+2. Highest config accuracy
+3. Highest repair effectiveness
+4. Lowest invalid JSON rate
+5. Acceptable runtime on 4 GB VRAM
+
 ## Build requirements
 
 - Java 21+
