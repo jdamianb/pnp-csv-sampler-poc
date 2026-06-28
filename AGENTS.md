@@ -52,8 +52,11 @@ Optional repair loop
   ↓
 Human review / accept / edit
   ↓
-Simple parser parses normalized placement preview
+Simple PoC parser produces normalized placement preview
 ```
+
+For this public PoC, the parser is a simple original implementation in this repository.
+It is not the proprietary company parser and must not use proprietary company code, test data, or internal behavior.
 
 ## Core design rules
 
@@ -318,7 +321,7 @@ Goal:
 ```text
 LLM proposed config
   ↓
-validator/parser dry-run error
+validator/simple parser dry-run error
   ↓
 repair prompt
   ↓
@@ -329,29 +332,44 @@ Allowed only after Stage 4 exists:
 
 - bounded repair loop
 - maximum retry count, usually 2 or 3
-- repair prompt containing validation/parser errors
-- final fallback to human correction
+- repair prompt containing validation/simple parser dry-run errors
+- final fallback to user correction
 
 Required rule:
 
 The repair loop must stop and expose the failure clearly if it cannot produce a valid configuration.
 
-### Stage 6: Human review and correction flow
+### Stage 6: Import configuration review and correction artifact
+
+This is a product PoC stage, not an agent harness approval gate.
 
 Goal:
 
 ```text
-proposed config
+detected config + parser dry-run report + repair history
   ↓
-human accept/edit/reject
+reviewable import configuration artifact
+  ↓
+user accepts, edits, or rejects the proposed configuration
 ```
 
 Allowed:
 
 - CLI review output
-- Markdown/JSON report
+- Markdown review report
+- JSON review report
+- editable proposed config JSON
+- diff between original detected config and repaired config
+- summary of parser dry-run result
 - future UI feature request, if explicitly approved
 - storing corrected examples for later evaluation, if explicitly approved
+
+Forbidden:
+
+- confusing this stage with Goose/harness human approval gates
+- adding a UI unless explicitly approved
+- persisting customer/proprietary files
+- treating the LLM output as accepted without user-visible validation evidence
 
 ### Stage 7: Evaluation and dataset building
 
@@ -587,6 +605,12 @@ The leader must stop for final human approval.
 
 ## Human gates
 
+These human gates are part of the Goose agent workflow.
+They are not the same as Stage 6.
+
+Stage 6 is about the product/user reviewing an import configuration.
+Human gates are about the human owner approving agent work before the next implementation phase.
+
 The leader must stop and request human review when:
 
 1. Specs are drafted.
@@ -674,7 +698,7 @@ The full PoC is complete only when:
 - deterministic tests pass
 - a local or cloud LLM adapter has been evaluated, if approved
 - the simple open parser dry-run validates proposed configs
-- the human can review or edit proposed configs
+- the user can review, edit, accept, or reject proposed import configurations through a review artifact
 - docs explain the workflow and limitations
 - known failure cases are documented
 - the final summary is written
