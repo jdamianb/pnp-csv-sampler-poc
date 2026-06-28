@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run parse error - config not found" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="com.example.pnp.Main" />
+    <module name="pnp-csv-sampler" />
+    <option name="PROGRAM_PARAMETERS" value="parse examples-extended/03_jlcpcb_cpl_minimal.csv nonexistent.json" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

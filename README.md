@@ -1,10 +1,11 @@
 # PnP CSV Sampler & Format Detector — Proof of Concept
 
-A Java 21 PoC with three stages:
+A Java 21 PoC with four stages:
 
 1. **Stage 1 — CSV Sampler**: Deterministically reads Pick-and-Place (PnP) CSV/TSV files as raw text and produces a structured JSON sample.
 2. **Stage 2 — LLM-assisted Format Detection**: Proposes a `PnpImportFormatConfig` (delimiter, columns, units, etc.) using an LLM client abstraction, validated before output.
 3. **Stage 3 — Real LLM Adapter**: Adds Ollama support behind the existing pipeline. Default remains stub (offline).
+4. **Stage 4 — Simple Open PnP Parser**: A deterministic parser that validates whether a proposed `PnpImportFormatConfig` can actually parse the file. Produces a `PnpParseDryRunReport` with row-level errors.
 
 ## Quick Start
 
@@ -27,8 +28,14 @@ java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.c
 java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar examples/simple-pnp.csv --first 4 --last 2
 java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv --first 40 --last 10
 
-# Run all tests (109 total, 3 skipped = integration)
+# Stage 4: Parse files using expected configs
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar parse examples-extended/03_jlcpcb_cpl_minimal.csv expected-configs/03_jlcpcb_cpl_minimal.config.json
+
+# Run all tests (132 total, 3 skipped = integration)
 mvn test
+
+# Stage 4 parser tests only
+mvn test -Dtest=SimplePnpParserTest
 
 # Generate and compare all example outputs (stub)
 mvn test -Dtest=ExampleOutputGeneratorTest
@@ -154,6 +161,44 @@ CLI args take precedence over environment variables.
 | Non-JSON response | Parse error, exit 1 |
 | Invalid config | Validation errors, exit 1 |
 
+## Stage 4 — Simple Open PnP Parser Dry-run
+
+### CLI Usage
+
+```bash
+# Parse a file using an expected config
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar parse <file> <config-json>
+```
+
+The parser reads the file and config, validates the config, parses data rows, and outputs a `PnpParseDryRunReport`.
+
+### Pipeline
+
+```
+parse <file> <config-json>
+  ├── Read config JSON → PnpImportFormatConfig
+  ├── PnpImportFormatConfigValidator → validate config
+  ├── SimplePnpParser.parse(reader, config)
+  │     ├── Read all lines
+  │     ├── Resolve HEADER_NAME / COLUMN_INDEX columns
+  │     ├── Apply linesToIgnore, dataStartRowIndex, dataEndRowIndex
+  │     ├── Split rows on delimiter (",", ";", "\t", WHITESPACE)
+  │     ├── Parse X/Y/angle with decimal separator handling
+  │     ├── Strip unit suffixes (mm, deg, etc.)
+  │     ├── Apply side value mappings
+  │     └── Collect row-level errors
+  └── Output: PnpParseDryRunReport JSON
+```
+
+### Supported Formats
+
+| Delimiter | Config Value | Example |
+|---|---|---|
+| Comma | `,` | JLCPCB, Altium, EasyEDA |
+| Semicolon | `;` | European decimal comma |
+| Tab | `\t` or `\\t` | Machine TSV |
+| Whitespace | `WHITESPACE` | KiCad `.pos` |
+
 ## Project Structure
 
 ```
@@ -186,6 +231,9 @@ CLI args take precedence over environment variables.
 │   │   ├── LlmClientFactory.java     # Factory: stub/ollama (Stage 3)
 │   │   ├── LlmOptions.java           # Provider config record (Stage 3)
 │   │   ├── LlmException.java         # LLM error exception (Stage 3)
+│   │   ├── PnpPlacement.java         # Normalized placement DTO (Stage 4)
+│   │   ├── PnpParseDryRunReport.java # Dry-run report DTO (Stage 4)
+│   │   ├── SimplePnpParser.java      # Deterministic parser (Stage 4)
 │   │   ├── FormatDetectionPromptBuilder.java # Prompt builder (Stage 2)
 │   │   ├── PnpImportFormatConfigValidator.java # Validator (Stage 2)
 │   │   └── Detector.java             # Orchestrator (Stage 2)
@@ -201,7 +249,8 @@ CLI args take precedence over environment variables.
 │       ├── LlmOptionsTest.java       # 8 tests (Stage 3)
 │       ├── LlmClientFactoryTest.java # 7 tests (Stage 3)
 │       ├── OllamaLlmClientTest.java  # 6 tests (Stage 3, offline)
-│       └── OllamaIntegrationTest.java # 3 tests (Stage 3, opt-in)
+│       ├── OllamaIntegrationTest.java # 3 tests (Stage 3, opt-in)
+│       └── SimplePnpParserTest.java   # 23 tests (Stage 4)
 ├── .goose/
 │   ├── handoffs/                     # Phase transition handoffs
 │   ├── reviews/                      # Code review reports
@@ -211,13 +260,15 @@ CLI args take precedence over environment variables.
 
 ## Tests
 
-**109 tests total** (106 deterministic, 3 opt-in integration) — no network required for default run.
+**132 tests total** (129 deterministic, 3 opt-in integration) — no network required for default run.
 
 ```bash
 mvn test                        # All tests (stub default, 3 skipped)
 mvn test -Dtest=SamplerTest     # Stage 1 sampler only
 mvn test -Dtest="*Validator*"   # Stage 2 validation only
 mvn test -Dtest="*Ollama*"      # Stage 3 Ollama offline tests
+mvn test -Dtest=SimplePnpParserTest  # Stage 4 parser tests
+mvn test -Dtest="*Parser*"      # All Stage 4 parser tests
 mvn test -Dllm.integration=true # Include Ollama integration tests (requires Ollama)
 mvn test -Dtest=ExampleOutputGeneratorTest  # Generate & compare (stub)
 mvn test -Dtest=ExampleOutputGeneratorTest -Dllm.integration=true \
@@ -253,3 +304,10 @@ This project was built using a role-based Goose agent harness. See `AGENTS.md` f
 3. **Implementer** — Ollama client, factory, CLI flags, error handling
 4. **Reviewer** — offline tests, stub default, no secrets, error handling
 5. **Doc Writer** — feature/testing docs, README update
+
+### Stage 4 Phases
+1. **Leader** — intake Stage 4 feature request (redefined: original parser, not proprietary)
+2. **Spec Writer** — EARS + Gherkin for simple deterministic parser
+3. **Implementer** — PnpPlacement, PnpParseDryRunReport, SimplePnpParser, parse CLI
+4. **Reviewer** — no proprietary code, all delimiter types, row-level errors
+5. **Doc Writer** — feature/testing docs, ADR update, README update

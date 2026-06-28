@@ -2,7 +2,7 @@
 
 This project uses a role-based Goose agent harness.
 
-All agents must read this file before editing code, specs, tests, or documentation.
+All agents must read this file before editing code, specs, tests, examples, or documentation.
 
 ## Project goal
 
@@ -27,7 +27,7 @@ The PoC goal is to automate as much of that manual import configuration as possi
 
 The LLM must act as a configuration assistant, not as the parser.
 
-The existing deterministic CSV parser remains the authority for parsing.
+For this public PoC, the parser must be an original, simple parser implemented in this repository. Do not use proprietary company parser code, proprietary parser behavior, proprietary test data, or proprietary file specifications.
 
 ## Product workflow target
 
@@ -46,13 +46,13 @@ Proposed PnP import format config JSON
   ↓
 Config validation
   ↓
-Existing parser dry-run
+Simple open PoC parser dry-run
   ↓
 Optional repair loop
   ↓
 Human review / accept / edit
   ↓
-Existing parser parses the file
+Simple parser parses normalized placement preview
 ```
 
 ## Core design rules
@@ -95,14 +95,33 @@ The detector must not:
 - parse the full file into placement rows
 - rewrite the CSV
 - invent component data
-- replace the existing parser
+- replace the parser
 - persist production formats unless explicitly requested
 
-### 3. The existing parser remains the authority
+### 3. The Stage 4 parser is simple, open, and original
 
-When parser integration is introduced, the parser dry-run decides whether the proposed configuration is usable.
+Because the real company parser is proprietary and not available in this repository, Stage 4 must implement a small original parser for the PoC.
 
-The LLM output is only a proposal.
+The Stage 4 parser must:
+
+- consume a `PnpImportFormatConfig`
+- read a PnP CSV/TSV-like input file
+- apply ignored lines and data row bounds
+- resolve mappings by header name or column index
+- parse required fields into a small normalized placement DTO
+- validate that X, Y, and angle are numeric
+- produce a dry-run report with rows parsed, rows rejected, errors, warnings, and sample normalized rows
+
+The Stage 4 parser must not:
+
+- copy or mimic proprietary company parser internals
+- use proprietary company code
+- use proprietary company test data
+- claim production compatibility
+- support every real machine format
+- perform LLM inference itself
+- call a real LLM
+- use Spring Boot
 
 ### 4. Tests must be deterministic
 
@@ -113,8 +132,11 @@ Unit tests must not require:
 - a running local LLM
 - a cloud LLM
 - external services
+- proprietary company files
 
 Real LLM tests must be opt-in integration tests.
+
+Parser tests must use synthetic examples only.
 
 ## Documentation reference
 
@@ -122,39 +144,42 @@ Feature documentation is stored under `docs/` with the feature name as the file 
 
 ### Stage 1 — CSV Sampler
 
-- `docs/feature-requests/pnp-csv-sampler-poc.md` — original feature request
-- `docs/specs/pnp-csv-sampler-spec.md` — EARS requirements and Gherkin scenarios
-- `docs/features/pnp-csv-sampler.md` — implemented feature documentation
-- `docs/adr/pnp-csv-sampler.md` — Architecture Decision Records (5 ADRs)
-- `docs/testing/pnp-csv-sampler.md` — test strategy and coverage
+- `docs/feature-requests/pnp-csv-sampler-poc.md`
+- `docs/specs/pnp-csv-sampler-spec.md`
+- `docs/features/pnp-csv-sampler.md`
+- `docs/testing/pnp-csv-sampler.md`
 
 ### Stage 2 — LLM-assisted Format Detection
 
-- `docs/feature-requests/llm-assisted-pnp-format-detection.md` — feature request
-- `docs/specs/llm-assisted-pnp-format-detection-spec.md` — EARS requirements and Gherkin scenarios
-- `docs/features/llm-assisted-pnp-format-detection.md` — implemented feature documentation
-- `docs/adr/0002-llm-as-pnp-import-configuration-assistant.md` — ADR for LLM role
-- `docs/testing/llm-assisted-pnp-format-detection.md` — test strategy and coverage
-- `expected-configs/` — expected config JSONs for example files
+- `docs/feature-requests/llm-assisted-pnp-format-detection.md`
+- `docs/specs/llm-assisted-pnp-format-detection-spec.md`
+- `docs/features/llm-assisted-pnp-format-detection.md`
+- `docs/testing/llm-assisted-pnp-format-detection.md`
+- `expected-configs/`
 
 ### Stage 3 — Real LLM Adapter
 
-- `docs/feature-requests/stage3-real-llm-adapter.md` — feature request
-- `docs/specs/stage3-real-llm-adapter-spec.md` — EARS requirements and Gherkin scenarios
-- `docs/features/llm-assisted-pnp-format-detection.md` — feature documentation (Stage 2+3 combined)
-- `docs/testing/llm-assisted-pnp-format-detection.md` — test strategy and coverage (Stage 2+3 combined)
+- `docs/feature-requests/stage3-real-llm-adapter.md`
+- `docs/specs/stage3-real-llm-adapter-spec.md`
+- Stage 3 may be documented inside `docs/features/llm-assisted-pnp-format-detection.md` or its own file.
+
+### Stage 4 — Simple Open PnP Parser Dry-run
+
+- `docs/feature-requests/stage4-simple-pnp-parser-dry-run.md`
+- `docs/specs/stage4-simple-pnp-parser-dry-run-spec.md`
+- `docs/features/stage4-simple-pnp-parser-dry-run.md`
+- `docs/testing/stage4-simple-pnp-parser-dry-run.md`
+- `docs/adr/0004-simple-open-pnp-parser-for-poc.md`
 
 Agents should read the relevant docs before working on a feature.
 
 ## PoC stages
 
-The project may evolve through these stages.
-
 Each stage is a separate feature and must go through the role workflow.
 
 ### Stage 1: CSV sampler
 
-Status: implemented or in progress.
+Status: implemented.
 
 Goal:
 
@@ -171,7 +196,7 @@ Allowed:
 - Jackson
 - JUnit 5
 - CLI command for sampling
-- example PnP files
+- synthetic example PnP files
 - documentation and tests
 
 Forbidden in Stage 1:
@@ -182,6 +207,8 @@ Forbidden in Stage 1:
 - Spring Boot
 
 ### Stage 2: LLM-assisted format detection contract
+
+Status: implemented.
 
 Goal:
 
@@ -209,11 +236,9 @@ Allowed:
 - `detect <file>` CLI command
 - deterministic tests
 
-The first Stage 2 implementation must use a stub LLM client.
-
-Real LLM calls are not required for this stage.
-
 ### Stage 3: Real LLM adapter
+
+Status: implemented or in testing.
 
 Goal:
 
@@ -240,30 +265,44 @@ Required safety rules:
 - provider selection must be configurable
 - temperature should be deterministic, usually `0`
 
-### Stage 4: Existing parser dry-run integration
+### Stage 4: Simple open PnP parser dry-run
+
+Status: next stage.
 
 Goal:
 
 ```text
-PnpImportFormatConfig
+PnP file + PnpImportFormatConfig
   ↓
-existing parser dry-run
+simple original parser
   ↓
-success/failure report
+PnpParseDryRunReport
 ```
 
-Allowed only after explicit human approval:
+Allowed:
 
-- adapter from PoC config DTO to existing parser configuration
-- parser dry-run result DTO
-- parser error reporting
-- validation of parsed row counts
-- validation that X/Y/angle are numeric where expected
+- original simple parser implementation
+- config-driven parsing
+- header-name and column-index mapping
+- comma, semicolon, tab, and simple whitespace delimiters
+- quote handling for common CSV cases
+- decimal separator normalization for `.` and `,`
+- coordinate suffix cleanup, such as `12.3mm`
+- side value mapping
+- row-level errors and warnings
+- `parse` or `dry-run` CLI command
+- deterministic tests using synthetic examples
 
 Forbidden:
 
-- replacing the existing parser
-- asking the LLM to parse placement rows directly
+- proprietary company parser code
+- proprietary company parser behavior copied from memory or internal docs
+- proprietary company data
+- production claims
+- LLM-based row parsing
+- Spring Boot
+- database
+- UI
 
 ### Stage 5: Repair loop
 
@@ -316,8 +355,9 @@ Measure whether the PoC reduces manual import setup.
 Allowed:
 
 - evaluation folder
-- representative sample files
+- representative synthetic sample files
 - expected config JSON files
+- expected normalized placement JSON files
 - accuracy report
 - manual correction count
 - time-saved notes
@@ -416,6 +456,8 @@ Responsibilities:
 - loop with the implementer until accepted
 
 The reviewer must reject implementations that violate core design rules.
+
+For Stage 4, the reviewer must explicitly check that no proprietary parser code, examples, or behavior were added.
 
 ### Doc Writer
 
@@ -544,7 +586,7 @@ The leader must stop and request human review when:
 2. Reviewer accepts implementation.
 3. Documentation is updated.
 4. A stage wants to introduce a real LLM call.
-5. A stage wants to integrate the existing parser.
+5. A stage wants to integrate or replace parser behavior.
 6. A stage wants to add persistence, UI, fine-tuning, or RAG.
 
 Use this wording:
@@ -580,6 +622,12 @@ Detector command, when applicable:
 java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv
 ```
 
+Stage 4 parser command, when applicable:
+
+```bash
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar parse examples/simple-pnp.csv expected-configs/simple-pnp.config.json
+```
+
 If the project uses a different invocation style, update this section and the README together.
 
 ## Configuration and secrets
@@ -600,11 +648,15 @@ Provider configuration must use:
 - command-line arguments
 - documented placeholders
 
-## Data safety
+## Data safety and IP boundaries
 
 Agents must not add real company/customer PnP files to the public repository.
 
+Agents must not use proprietary company parser code, proprietary parser behavior, proprietary sample files, or internal documentation.
+
 Use synthetic examples unless the human explicitly provides approved public samples.
+
+If there is uncertainty about whether an example, behavior, or format detail is proprietary, stop and ask the human.
 
 ## Full PoC completion criteria
 
@@ -614,7 +666,7 @@ The full PoC is complete only when:
 - the detector proposes valid import configs
 - deterministic tests pass
 - a local or cloud LLM adapter has been evaluated, if approved
-- parser dry-run validates proposed configs, if approved
+- the simple open parser dry-run validates proposed configs
 - the human can review or edit proposed configs
 - docs explain the workflow and limitations
 - known failure cases are documented
@@ -636,4 +688,4 @@ over:
 big implementation → many features → difficult review
 ```
 
-The PoC should remain understandable, testable, and easy to adapt to the real parser.
+The PoC should remain understandable, testable, original, and safe to publish.

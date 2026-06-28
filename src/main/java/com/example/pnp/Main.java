@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
  * <p>
  * Usage:
  *   java ... com.example.pnp.Main sample &lt;file&gt; [--first N] [--last M]
+ *   java ... com.example.pnp.Main parse &lt;file&gt; &lt;config-json&gt;
  *   java ... com.example.pnp.Main detect &lt;file&gt; [--first N] [--last M]
  *                                       [--llm-provider NAME] [--llm-url URL]
  *                                       [--llm-model MODEL] [--llm-temperature T]
@@ -55,7 +56,9 @@ public class Main {
     private static class CliOptions {
         boolean detectMode;
         boolean explicitSampleMode;
+        boolean parseMode;
         String filePath;
+        String configFilePath; // for parse command
         int firstCount = DEFAULT_FIRST;
         int lastCount = DEFAULT_LAST;
         String llmProvider;
@@ -73,9 +76,10 @@ public class Main {
         var cli = new CliOptions();
 
         // Determine command mode
+        cli.parseMode = "parse".equals(args[0]);
         cli.detectMode = "detect".equals(args[0]);
         cli.explicitSampleMode = "sample".equals(args[0]);
-        int argOffset = (cli.detectMode || cli.explicitSampleMode) ? 1 : 0;
+        int argOffset = (cli.parseMode || cli.detectMode || cli.explicitSampleMode) ? 1 : 0;
 
         if (argOffset >= args.length) {
             System.err.println("Error: missing file path");
@@ -84,6 +88,18 @@ public class Main {
         }
 
         cli.filePath = args[argOffset];
+
+        // Parse command needs an additional config file argument
+        if (cli.parseMode) {
+            if (argOffset + 1 >= args.length) {
+                System.err.println("Error: parse command requires a config JSON file path");
+                printUsage();
+                return 1;
+            }
+            cli.configFilePath = args[argOffset + 1];
+            // No optional flags for parse mode; skip flag parsing
+            return runParse(cli);
+        }
 
         // Parse optional flags
         int i = argOffset + 1;
@@ -243,6 +259,50 @@ public class Main {
     }
 
     /**
+     * Run the Stage 4 simple parser dry-run.
+     * <p>
+     * Reads the input file and config JSON, validates the config,
+     * runs the parser, and prints the dry-run report.
+     */
+    private static int runParse(CliOptions cli) throws IOException {
+        var mapper = new ObjectMapper()
+                .enable(SerializationFeature.INDENT_OUTPUT);
+
+        // Read and parse config JSON
+        PnpImportFormatConfig config;
+        try {
+            config = mapper.readValue(
+                    new java.io.File(cli.configFilePath), PnpImportFormatConfig.class);
+        } catch (IOException e) {
+            System.err.println("Error: failed to read config file '"
+                    + cli.configFilePath + "': " + e.getMessage());
+            return 1;
+        }
+
+        // Validate config
+        var validator = new PnpImportFormatConfigValidator();
+        var validationErrors = validator.validate(config);
+        if (!validationErrors.isEmpty()) {
+            System.err.println("Config validation failed:");
+            for (var err : validationErrors) {
+                System.err.println("  - " + err);
+            }
+            return 1;
+        }
+
+        // Run parser
+        var parser = new SimplePnpParser();
+        PnpParseDryRunReport report;
+        try (var reader = new InputStreamReader(
+                new FileInputStream(cli.filePath), StandardCharsets.UTF_8)) {
+            report = parser.parse(reader, config);
+        }
+
+        mapper.writeValue(System.out, report);
+        return report.success() ? 0 : 1;
+    }
+
+    /**
      * Default stub JSON response used when no real LLM provider is configured.
      */
     static String getDefaultStubJson() {
@@ -277,12 +337,14 @@ public class Main {
     private static void printUsage() {
         System.err.println("Usage:");
         System.err.println("  java ... com.example.pnp.Main sample <file> [--first N] [--last M]");
+        System.err.println("  java ... com.example.pnp.Main parse <file> <config-json>");
         System.err.println("  java ... com.example.pnp.Main detect <file> [--first N] [--last M]");
         System.err.println("                       [--llm-provider NAME] [--llm-url URL]");
         System.err.println("                       [--llm-model MODEL] [--llm-temperature T]");
         System.err.println();
         System.err.println("Commands:");
         System.err.println("  sample    Sample a PnP CSV file and output numbered lines as JSON");
+        System.err.println("  parse     Parse a PnP file using a config JSON and output dry-run report");
         System.err.println("  detect    Detect PnP import format configuration via LLM");
         System.err.println();
         System.err.println("If no command is given, 'sample' is assumed for backward compatibility.");
