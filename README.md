@@ -1,11 +1,12 @@
 # PnP CSV Sampler & Format Detector — Proof of Concept
 
-A Java 21 PoC with four stages:
+A Java 21 PoC with five stages:
 
 1. **Stage 1 — CSV Sampler**: Deterministically reads Pick-and-Place (PnP) CSV/TSV files as raw text and produces a structured JSON sample.
 2. **Stage 2 — LLM-assisted Format Detection**: Proposes a `PnpImportFormatConfig` (delimiter, columns, units, etc.) using an LLM client abstraction, validated before output.
 3. **Stage 3 — Real LLM Adapter**: Adds Ollama support behind the existing pipeline. Default remains stub (offline).
 4. **Stage 4 — Simple Open PnP Parser**: A deterministic parser that validates whether a proposed `PnpImportFormatConfig` can actually parse the file. Produces a `PnpParseDryRunReport` with row-level errors.
+5. **Stage 5 — Repair Loop**: A bounded repair loop that automatically corrects invalid `PnpImportFormatConfig` proposals by sending validation and parser errors back to the LLM.
 
 ## Quick Start
 
@@ -36,6 +37,12 @@ mvn test
 
 # Stage 4 parser tests only
 mvn test -Dtest=SimplePnpParserTest
+
+# Stage 5: Detect with repair loop
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv --repair-max 2
+
+# Run repair loop on all examples with Ollama
+bash scripts/run-repair-loop.sh http://localhost:11434 qwen2.5:3b
 
 # Generate and compare all example outputs (stub)
 mvn test -Dtest=ExampleOutputGeneratorTest
@@ -199,6 +206,46 @@ parse <file> <config-json>
 | Tab | `\t` or `\\t` | Machine TSV |
 | Whitespace | `WHITESPACE` | KiCad `.pos` |
 
+## Stage 5 — Repair Loop for Config Correction
+
+### CLI Usage
+
+```bash
+# Detect with repair enabled (default: max 2 attempts)
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv
+
+# Detect without repair (original behavior)
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv --no-repair
+
+# Run repair loop on all examples with Ollama
+bash scripts/run-repair-loop.sh
+```
+
+### Pipeline
+
+```
+detect <file> [--repair-max N]
+  │
+  ├── Detector.detect(sample) → DetectionResult
+  ├── If valid AND parser succeeds → output (no repair)
+  └── Else (repair loop, up to maxRetries):
+        ├── Build repair prompt (sample + broken config + errors)
+        ├── Send to LLM → corrected config
+        ├── Validate + parser-check
+        ├── If valid → output with repaired:true
+        ├── If identical JSON → stop (stub detected)
+        └── Exhausted → expose errors
+```
+
+### Script: run-repair-loop.sh
+
+The `scripts/run-repair-loop.sh` script runs the repair loop with Ollama on all files in `examples-extended/` and compares results against `expected-configs/`.
+
+Outputs:
+- `target/repair-loop-results/` — JSON per file with repair metadata
+- `target/repair-loop-logs/` — diagnostic logs with repair prompts and LLM responses
+- Summary with breakdown: valid immediately, repaired, failed after repair, detection failed
+
 ## Project Structure
 
 ```
@@ -234,6 +281,8 @@ parse <file> <config-json>
 │   │   ├── PnpPlacement.java         # Normalized placement DTO (Stage 4)
 │   │   ├── PnpParseDryRunReport.java # Dry-run report DTO (Stage 4)
 │   │   ├── SimplePnpParser.java      # Deterministic parser (Stage 4)
+│   │   ├── RepairPromptBuilder.java  # Repair prompt builder (Stage 5)
+│   │   ├── RepairLoop.java           # Bounded repair orchestrator (Stage 5)
 │   │   ├── FormatDetectionPromptBuilder.java # Prompt builder (Stage 2)
 │   │   ├── PnpImportFormatConfigValidator.java # Validator (Stage 2)
 │   │   └── Detector.java             # Orchestrator (Stage 2)
@@ -250,7 +299,12 @@ parse <file> <config-json>
 │       ├── LlmClientFactoryTest.java # 7 tests (Stage 3)
 │       ├── OllamaLlmClientTest.java  # 6 tests (Stage 3, offline)
 │       ├── OllamaIntegrationTest.java # 3 tests (Stage 3, opt-in)
-│       └── SimplePnpParserTest.java   # 23 tests (Stage 4)
+│       ├── SimplePnpParserTest.java   # 23 tests (Stage 4)
+│       ├── RepairPromptBuilderTest.java # 7 tests (Stage 5)
+│       ├── RepairLoopTest.java         # 6 tests (Stage 5)
+│       ├── RepairLoopExampleTest.java  # Diagnostic tool (Stage 5)
+│       └── scripts/
+│           └── run-repair-loop.sh      # Repair loop runner (Stage 5)
 ├── .goose/
 │   ├── handoffs/                     # Phase transition handoffs
 │   ├── reviews/                      # Code review reports
@@ -260,7 +314,7 @@ parse <file> <config-json>
 
 ## Tests
 
-**132 tests total** (129 deterministic, 3 opt-in integration) — no network required for default run.
+**150 tests total** (147 deterministic, 3 opt-in integration) — no network required for default run.
 
 ```bash
 mvn test                        # All tests (stub default, 3 skipped)
@@ -269,6 +323,9 @@ mvn test -Dtest="*Validator*"   # Stage 2 validation only
 mvn test -Dtest="*Ollama*"      # Stage 3 Ollama offline tests
 mvn test -Dtest=SimplePnpParserTest  # Stage 4 parser tests
 mvn test -Dtest="*Parser*"      # All Stage 4 parser tests
+mvn test -Dtest=RepairPromptBuilderTest,RepairLoopTest  # Stage 5 repair tests
+mvn test -Dtest=RepairLoopExampleTest  # Stage 5 repair diagnostic (stub)
+mvn test -Dtest=RepairLoopExampleTest -Dllm.integration=true  # With Ollama
 mvn test -Dllm.integration=true # Include Ollama integration tests (requires Ollama)
 mvn test -Dtest=ExampleOutputGeneratorTest  # Generate & compare (stub)
 mvn test -Dtest=ExampleOutputGeneratorTest -Dllm.integration=true \
@@ -311,3 +368,10 @@ This project was built using a role-based Goose agent harness. See `AGENTS.md` f
 3. **Implementer** — PnpPlacement, PnpParseDryRunReport, SimplePnpParser, parse CLI
 4. **Reviewer** — no proprietary code, all delimiter types, row-level errors
 5. **Doc Writer** — feature/testing docs, ADR update, README update
+
+### Stage 5 Phases
+1. **Leader** — intake Stage 5 feature request (bounded repair loop)
+2. **Spec Writer** — EARS + Gherkin for repair loop
+3. **Implementer** — RepairPromptBuilder, RepairLoop, --repair-max/--no-repair CLI
+4. **Reviewer** — stub detection, bounded retries, parser verification
+5. **Doc Writer** — feature/testing docs, README update

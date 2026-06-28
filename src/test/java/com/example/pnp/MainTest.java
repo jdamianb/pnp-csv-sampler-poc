@@ -291,4 +291,50 @@ class MainTest {
         });
         assertEquals(1, exitCode);
     }
+
+    // ============================================================
+    //  Stage 5: Repair loop CLI tests
+    // ============================================================
+
+    @Test
+    void detectWithNoRepairFlag() throws IOException {
+        var file = createTempFile("data\n");
+        var exitCode = Main.run(new String[]{
+                "detect", file.toString(),
+                "--no-repair"
+        });
+        // Should run without repair — stub config is valid, so exit 0
+        assertEquals(0, exitCode);
+    }
+
+    @Test
+    void detectWithRepairMaxZero() throws IOException {
+        var file = createTempFile("data\n");
+        var exitCode = Main.run(new String[]{
+                "detect", file.toString(),
+                "--repair-max", "0"
+        });
+        // --repair-max 0 is equivalent to --no-repair
+        assertEquals(0, exitCode);
+    }
+
+    @Test
+    void detectWithRepairMaxNegative() throws IOException {
+        var file = createTempFile("data\n");
+        var exitCode = Main.run(new String[]{
+                "detect", file.toString(),
+                "--repair-max", "-1"
+        });
+        assertEquals(1, exitCode);
+    }
+
+    @Test
+    void detectWithRepairMaxNonNumeric() throws IOException {
+        var file = createTempFile("data\n");
+        var exitCode = Main.run(new String[]{
+                "detect", file.toString(),
+                "--repair-max", "abc"
+        });
+        assertEquals(1, exitCode);
+    }
 }

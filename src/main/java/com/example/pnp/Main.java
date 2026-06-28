@@ -65,6 +65,8 @@ public class Main {
         String llmUrl;
         String llmModel;
         Double llmTemperature;
+        int repairMax = 2; // default repair attempts
+        boolean noRepair;
     }
 
     private static int runInternal(String[] args) throws IOException {
@@ -142,6 +144,23 @@ public class Main {
                         return 1;
                     }
                 }
+                case "--repair-max" -> {
+                    if (++i >= args.length) return missingArg("--repair-max", "non-negative integer");
+                    try {
+                        cli.repairMax = Integer.parseInt(args[i]);
+                        if (cli.repairMax < 0) {
+                            System.err.println("Error: --repair-max must be >= 0, got " + cli.repairMax);
+                            return 1;
+                        }
+                    } catch (NumberFormatException e) {
+                        System.err.println("Error: --repair-max must be a non-negative integer, got '" + args[i] + "'");
+                        return 1;
+                    }
+                }
+                case "--no-repair" -> {
+                    cli.noRepair = true;
+                    cli.repairMax = 0;
+                }
                 default -> {
                     System.err.println("Error: unknown option '" + args[i] + "'");
                     printUsage();
@@ -209,17 +228,51 @@ public class Main {
         }
 
         var detector = new Detector(promptBuilder, llmClient, validator, objectMapper);
-        var result = detector.detect(sampleResult);
+
+        // If repair is disabled (--no-repair or --repair-max 0), use original flow
+        if (cli.noRepair || cli.repairMax == 0) {
+            var result = detector.detect(sampleResult);
+            if (result.isValid()) {
+                objectMapper.writeValue(System.out, result.config());
+                return 0;
+            } else {
+                System.err.println("Detection failed:");
+                for (var error : result.errors()) {
+                    System.err.println("  - " + error);
+                }
+                return 1;
+            }
+        }
+
+        // Repair loop mode
+        var repairPromptBuilder = new RepairPromptBuilder();
+        var parser = new SimplePnpParser();
+        var repairLoop = new RepairLoop(detector, repairPromptBuilder, llmClient,
+                objectMapper, validator, parser);
+
+        // Read file content for parser verification
+        java.io.Reader fileReader = new InputStreamReader(
+                new FileInputStream(cli.filePath), StandardCharsets.UTF_8);
+        var result = repairLoop.detectWithRepair(sampleResult, fileReader, cli.repairMax);
 
         if (result.isValid()) {
-            objectMapper.writeValue(System.out, result.config());
+            // Output config with repair metadata
+            var output = new java.util.LinkedHashMap<String, Object>();
+            output.put("repaired", result.wasRepaired());
+            output.put("repairAttempts", result.repairAttempts());
+            output.put("config", result.config());
+            objectMapper.writeValue(System.out, output);
             return 0;
         } else {
-            // Check if this was an LlmException (caught by Detector as parse error)
-            System.err.println("Detection failed:");
-            for (var error : result.errors()) {
-                System.err.println("  - " + error);
+            // Output error with repair metadata
+            var output = new java.util.LinkedHashMap<String, Object>();
+            output.put("repaired", result.wasRepaired());
+            output.put("repairAttempts", result.repairAttempts());
+            output.put("errors", result.errors());
+            if (result.config() != null) {
+                output.put("lastConfig", result.config());
             }
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(System.err, output);
             return 1;
         }
     }
@@ -359,6 +412,10 @@ public class Main {
         System.err.println("  --llm-model MODEL         LLM model name");
         System.err.println("  --llm-temperature T       Temperature (default: 0)");
         System.err.println();
+        System.err.println("Repair options (detect mode only):");
+        System.err.println("  --repair-max N            Max repair attempts (default: 2, 0 = disabled)");
+        System.err.println("  --no-repair               Disable repair loop (equivalent to --repair-max 0)");
+        System.err.println();
         System.err.println("Environment variables (overridden by CLI args):");
         System.err.println("  PNP_LLM_PROVIDER");
         System.err.println("  PNP_LLM_BASE_URL");
@@ -366,5 +423,6 @@ public class Main {
         System.err.println("  PNP_LLM_TEMPERATURE");
         System.err.println();
         System.err.println("If no LLM provider is configured, StubLlmClient is used.");
+        System.err.println("The repair loop is enabled by default (max 2 attempts).");
     }
 }

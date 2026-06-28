@@ -171,6 +171,13 @@ Feature documentation is stored under `docs/` with the feature name as the file 
 - `docs/testing/stage4-simple-pnp-parser-dry-run.md`
 - `docs/adr/0004-simple-open-pnp-parser-for-poc.md`
 
+### Stage 5 — Repair Loop for Config Correction
+
+- `docs/feature-requests/stage5-repair-loop.md`
+- `docs/specs/stage5-repair-loop-spec.md`
+- `docs/features/stage5-repair-loop.md`
+- `docs/testing/stage5-repair-loop.md`
+
 Agents should read the relevant docs before working on a feature.
 
 ## PoC stages
