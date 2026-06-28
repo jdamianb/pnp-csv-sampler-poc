@@ -29,6 +29,17 @@ public class RepairPromptBuilder {
             
             """;
 
+    private static final String SEPARATOR_ANALYSIS_HEADER = """
+            
+            DETERMINISTIC SEPARATOR ANALYSIS:
+            """;
+
+    private static final String SEPARATOR_ANALYSIS_INSTRUCTION = """
+            
+            The previous config used a delimiter that may be incorrect.
+            Review the separator analysis above and consider correcting the delimiter if the evidence supports it.
+            """;
+
     private static final String FINAL_INSTRUCTION = """
             
             Please correct the configuration to fix these errors.
@@ -38,6 +49,12 @@ public class RepairPromptBuilder {
             Return ONLY valid JSON matching the expected schema from the original instructions.
             Do not include any explanation, markdown formatting, or code fences.
             """;
+
+    private final SeparatorCandidateAnalyzer separatorAnalyzer;
+
+    public RepairPromptBuilder() {
+        this.separatorAnalyzer = new SeparatorCandidateAnalyzer();
+    }
 
     /**
      * Build a repair prompt from the original sample, the broken config, and the errors.
@@ -49,14 +66,38 @@ public class RepairPromptBuilder {
      */
     public String build(SampleResult sample, String configJson, List<String> errors) {
         var sampleLines = buildSampleLines(sample);
+        var separatorJson = buildSeparatorAnalysis(sample);
 
-        return REPAIR_HEADER.trim() + "\n"
-                + configJson + "\n"
-                + ERRORS_HEADER.trim() + "\n"
-                + formatErrors(errors) + "\n"
-                + INSTRUCTION.trim() + "\n"
-                + sampleLines + "\n"
-                + FINAL_INSTRUCTION.trim();
+        var prompt = new StringBuilder();
+        prompt.append(REPAIR_HEADER.trim()).append("\n");
+        prompt.append(configJson).append("\n");
+        prompt.append(ERRORS_HEADER.trim()).append("\n");
+        prompt.append(formatErrors(errors)).append("\n");
+
+        // Include separator analysis for delimiter-related errors
+        boolean hasDelimiterError = errors != null && errors.stream()
+                .anyMatch(e -> e.toLowerCase().contains("delimiter")
+                        || e.toLowerCase().contains("column")
+                        || e.toLowerCase().contains("not found"));
+        if (hasDelimiterError) {
+            prompt.append(SEPARATOR_ANALYSIS_HEADER.trim()).append("\n");
+            prompt.append(separatorJson).append("\n");
+            prompt.append(SEPARATOR_ANALYSIS_INSTRUCTION.trim()).append("\n");
+        }
+
+        prompt.append(INSTRUCTION.trim()).append("\n");
+        prompt.append(sampleLines).append("\n");
+        prompt.append(FINAL_INSTRUCTION.trim());
+        return prompt.toString();
+    }
+
+    private String buildSeparatorAnalysis(SampleResult sample) {
+        try {
+            var analysis = separatorAnalyzer.analyze(sample);
+            return separatorAnalyzer.toJson(analysis);
+        } catch (Exception e) {
+            return "{\"error\": \"" + e.getMessage() + "\"}";
+        }
     }
 
     private static String formatErrors(List<String> errors) {

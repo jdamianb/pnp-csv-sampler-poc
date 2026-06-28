@@ -1,423 +1,429 @@
-# PnP CSV Sampler & Format Detector — Proof of Concept
+# PnP CSV Sampler & LLM-assisted Import Format PoC
 
-A Java 21 PoC with six stages:
+A Java 21 proof of concept for reducing the manual setup required to import Pick-and-Place (PnP) CSV/TSV-like files.
 
-1. **Stage 1 — CSV Sampler**: Deterministically reads Pick-and-Place (PnP) CSV/TSV files as raw text and produces a structured JSON sample.
-2. **Stage 2 — LLM-assisted Format Detection**: Proposes a `PnpImportFormatConfig` (delimiter, columns, units, etc.) using an LLM client abstraction, validated before output.
-3. **Stage 3 — Real LLM Adapter**: Adds Ollama support behind the existing pipeline. Default remains stub (offline).
-4. **Stage 4 — Simple Open PnP Parser**: A deterministic parser that validates whether a proposed `PnpImportFormatConfig` can actually parse the file. Produces a `PnpParseDryRunReport` with row-level errors.
-5. **Stage 5 — Repair Loop**: A bounded repair loop that automatically corrects invalid `PnpImportFormatConfig` proposals by sending validation and parser errors back to the LLM.
-6. **Stage 7 — Evaluation and Dataset Building**: An evaluation harness that measures the LLM-assisted format detection accuracy across 12 example files, with known failure cases documented.
+The project explores this workflow:
 
-## Quick Start
+```text
+PnP CSV/TSV-like file
+  ↓
+CSV sampler
+  ↓
+Numbered raw sample JSON
+  ↓
+LLM-assisted format detector
+  ↓
+Proposed PnP import format config JSON
+  ↓
+Config validation
+  ↓
+Simple open PoC parser dry-run
+  ↓
+Repair loop, when needed
+  ↓
+Evaluation report
+```
+
+The LLM is used as a **configuration assistant**. It proposes how the file should be read. It does **not** replace the deterministic parser and it does **not** parse placement rows directly.
+
+## Why this exists
+
+PnP files exported from CAD tools and assembly machines are often similar, but not identical.
+
+A user may need to manually configure:
+
+- which lines to ignore
+- which row contains the header
+- where data starts and ends
+- which column is reference/designator
+- which column is part number
+- which column is JEDEC/package/footprint
+- which column is X
+- which column is Y
+- which column is angle/rotation
+- which column is side/layer
+- which delimiter is used
+- which decimal separator is used
+- which units are used
+
+This PoC tries to reduce that manual work.
+
+## Important boundaries
+
+This is a public, original PoC.
+
+It does not use proprietary company parser code, proprietary examples, customer files, or internal machine specifications.
+
+The simple parser in this repository is not intended to be production-grade. It exists to validate whether an LLM-proposed import configuration is plausible and parseable.
+
+## Current PoC stages
+
+### Stage 1 — CSV sampler
+
+The sampler reads a PnP CSV/TSV-like file as raw text and produces a numbered sample.
+
+The sampler is intentionally dumb and deterministic:
+
+- no CSV parsing
+- no delimiter inference
+- no column mapping
+- no trimming
+- no LLM calls
+
+Example:
 
 ```bash
-# Build
-mvn clean package
-
-# Stage 1: Sample example files
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar examples/simple-pnp.csv
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar examples/messy-pnp.csv
-
-# Stage 2: Detect import format with stub (default, offline)
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv
-
-# Stage 3: Detect with real LLM (requires Ollama running)
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv \
-  --llm-provider ollama --llm-url http://localhost:11434 --llm-model qwen2.5:3b
-
-# Custom sample sizes (works with all modes)
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar examples/simple-pnp.csv --first 4 --last 2
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv --first 40 --last 10
-
-# Stage 4: Parse files using expected configs
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar parse examples-extended/03_jlcpcb_cpl_minimal.csv expected-configs/03_jlcpcb_cpl_minimal.config.json
-
-# Run all tests (132 total, 3 skipped = integration)
-mvn test
-
-# Stage 4 parser tests only
-mvn test -Dtest=SimplePnpParserTest
-
-# Stage 5: Detect with repair loop
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv --repair-max 2
-
-# Run repair loop on all examples with Ollama
-bash scripts/run-repair-loop.sh http://localhost:11434 qwen2.5:3b
-
-# Stage 7: Run evaluation (stub)
-bash scripts/run-evaluation.sh
-
-# Run evaluation with Ollama
-bash scripts/run-evaluation.sh http://localhost:11434 qwen2.5:3b
-
-# Generate and compare all example outputs (stub)
-mvn test -Dtest=ExampleOutputGeneratorTest
-
-# Generate with Ollama
-mvn test -Dtest=ExampleOutputGeneratorTest -Dllm.integration=true -Dllm.url=http://localhost:11434 -Dllm.model=qwen2.5:3b
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar sample examples/simple-pnp.csv
 ```
 
-## Stage 1 — CSV Sampler
+### Stage 2 — LLM-assisted format detection contract
 
-### Usage
+Stage 2 introduced the configuration model and detector boundary:
 
-```
-java ... com.example.pnp.Main sample <file> [--first N] [--last M]
-```
+- `PnpImportFormatConfig`
+- `ColumnMapping`
+- `ColumnSource`
+- `FormatDetectionPromptBuilder`
+- `PnpImportFormatConfigValidator`
+- `LlmClient`
+- `StubLlmClient`
+- `Detector`
 
-### Example Output
+The detector proposes parser configuration JSON, not normalized placement rows.
 
-```json
-{
-  "totalLines" : 8,
-  "firstLines" : [ {
-    "index" : 0,
-    "text" : "# Pick and Place Export"
-  }, {
-    "index" : 1,
-    "text" : "# Source: Example CAD Tool"
-  } ],
-  "lastLines" : [ ]
-}
-```
-
-### Design
-
-| Principle | Implementation |
-|---|---|
-| **Dumb & deterministic** | Reads raw lines, no CSV parsing, no inference, no trimming |
-| **Streaming** | Ring buffer for tail — memory proportional to sample size, not file size |
-| **No duplicates** | Lines overlapping between first and last samples appear only once (R10) |
-| **Testable** | `Sampler` accepts `Reader` — tests don't need filesystem |
-
-## Stage 2 — LLM-assisted Format Detection
-
-### CLI Usage
+Example:
 
 ```bash
-# Detect import format config
 java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv
 ```
 
-### Pipeline
+By default, detection should remain deterministic and testable without a network connection.
 
-```
-detect <file> [--llm-provider ...]
-  ├── Sampler (Stage 1) → SampleResult
-  ├── FormatDetectionPromptBuilder → prompt
-  ├── LlmClientFactory
-  │     ├── provider=null/blank → StubLlmClient (default)
-  │     └── provider="ollama"   → OllamaLlmClient
-  ├── PnpImportFormatConfigValidator → validation
-  └── Output: config JSON or validation/LLM errors
-```
+### Stage 3 — Real LLM adapter
 
-### Components
+Stage 3 adds a real LLM provider behind the `LlmClient` abstraction.
 
-| Component | Purpose |
-|---|---|
-| `PnpImportFormatConfig` | Config model: 14 fields |
-| `ColumnMapping` / `ColumnSource` | Column mapping: `HEADER_NAME` or `COLUMN_INDEX` |
-| `FormatDetectionPromptBuilder` | Builds LLM prompt from sample |
-| `LlmClient` interface | Abstraction for LLM calls |
-| `StubLlmClient` | Deterministic stub (default) |
-| `OllamaLlmClient` | Real LLM client using Java `HttpClient` |
-| `LlmClientFactory` | Factory: stub by default, Ollama when configured |
-| `LlmOptions` | Provider config: provider, baseUrl, model, temperature |
-| `PnpImportFormatConfigValidator` | 12 validation rules |
-| `Detector` | Orchestrator: prompt → LLM → parse → validate |
-| `Main` (updated) | CLI: `sample`, `detect`, `--llm-*` flags |
+The intended local-first provider is Ollama.
 
-### Validation Rules (12 rules)
-
-Rejects configs missing X, Y, angle, or identity columns; blank delimiter; invalid confidence/row indexes; same column index for x/y/angle; non-numeric COLUMN_INDEX values.
-
-## Stage 3 — Real LLM Adapter (Ollama)
-
-### CLI Usage
+Example with Ollama:
 
 ```bash
-# Default: stub (offline, no LLM required)
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv
+export PNP_LLM_PROVIDER=ollama
+export PNP_LLM_BASE_URL=http://localhost:11434
+export PNP_LLM_MODEL=qwen2.5:3b
+export PNP_LLM_TEMPERATURE=0
 
-# With Ollama (real LLM analysis)
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv \
-  --llm-provider ollama \
-  --llm-url http://localhost:11434 \
-  --llm-model qwen2.5:3b
-
-# Or via environment variables
-PNP_LLM_PROVIDER=ollama PNP_LLM_BASE_URL=http://localhost:11434 \
-PNP_LLM_MODEL=qwen2.5:3b \
 java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv
 ```
 
-### Provider Configuration
+Unit tests must still pass without Ollama or internet access.
 
-| Flag | Env Variable | Default | Description |
-|---|---|---|---|
-| `--llm-provider NAME` | `PNP_LLM_PROVIDER` | (stub) | Provider: "ollama" |
-| `--llm-url URL` | `PNP_LLM_BASE_URL` | — | Ollama endpoint URL |
-| `--llm-model MODEL` | `PNP_LLM_MODEL` | — | Model name (e.g., `qwen2.5:3b`) |
-| `--llm-temperature T` | `PNP_LLM_TEMPERATURE` | 0 | Temperature (0 = deterministic) |
+### Stage 4 — Simple open PoC parser dry-run
 
-CLI args take precedence over environment variables.
+Stage 4 adds a simple original parser for this public PoC.
 
-### Error Handling
+It consumes:
 
-| Scenario | Behavior |
-|---|---|
-| No provider configured | StubLlmClient, exit 0 |
-| Unknown provider | Error message, exit 1 |
-| Missing URL/model | Error from constructor, exit 1 |
-| Ollama not running | Connection refused error, exit 1 |
-| Non-JSON response | Parse error, exit 1 |
-| Invalid config | Validation errors, exit 1 |
+```text
+PnP file + PnpImportFormatConfig
+```
 
-## Stage 4 — Simple Open PnP Parser Dry-run
+and produces a dry-run report such as:
 
-### CLI Usage
+```text
+PnpParseDryRunReport
+```
+
+The parser validates whether the proposed config can actually parse rows into a small normalized placement preview.
+
+Example:
 
 ```bash
-# Parse a file using an expected config
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar parse <file> <config-json>
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar parse examples/simple-pnp.csv expected-configs/simple-pnp.config.json
 ```
 
-The parser reads the file and config, validates the config, parses data rows, and outputs a `PnpParseDryRunReport`.
+Supported concepts include:
 
-### Pipeline
+- header-name mappings
+- column-index mappings
+- comma, semicolon, tab, and simple whitespace delimiters
+- decimal separator `.` and `,`
+- simple unit suffix cleanup such as `mm`
+- side/layer value mappings
+- row-level parse errors
 
-```
-parse <file> <config-json>
-  ├── Read config JSON → PnpImportFormatConfig
-  ├── PnpImportFormatConfigValidator → validate config
-  ├── SimplePnpParser.parse(reader, config)
-  │     ├── Read all lines
-  │     ├── Resolve HEADER_NAME / COLUMN_INDEX columns
-  │     ├── Apply linesToIgnore, dataStartRowIndex, dataEndRowIndex
-  │     ├── Split rows on delimiter (",", ";", "\t", WHITESPACE)
-  │     ├── Parse X/Y/angle with decimal separator handling
-  │     ├── Strip unit suffixes (mm, deg, etc.)
-  │     ├── Apply side value mappings
-  │     └── Collect row-level errors
-  └── Output: PnpParseDryRunReport JSON
-```
+### Stage 5 — Repair loop
 
-### Supported Formats
+Stage 5 uses validation or parser dry-run errors to ask the LLM for a corrected configuration.
 
-| Delimiter | Config Value | Example |
-|---|---|---|
-| Comma | `,` | JLCPCB, Altium, EasyEDA |
-| Semicolon | `;` | European decimal comma |
-| Tab | `\t` or `\\t` | Machine TSV |
-| Whitespace | `WHITESPACE` | KiCad `.pos` |
+The repair loop must be bounded. It should stop after a small number of attempts and expose a clear failure if no valid config can be produced.
 
-## Stage 5 — Repair Loop for Config Correction
+Example flow:
 
-### CLI Usage
-
-```bash
-# Detect with repair enabled (default: max 2 attempts)
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv
-
-# Detect without repair (original behavior)
-java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv --no-repair
-
-# Run repair loop on all examples with Ollama
-bash scripts/run-repair-loop.sh
+```text
+LLM proposed config
+  ↓
+validator/simple parser dry-run error
+  ↓
+repair prompt
+  ↓
+corrected config
 ```
 
-### Pipeline
+### Stage 6 — Import configuration review and correction artifact
 
-```
-detect <file> [--repair-max N]
-  │
-  ├── Detector.detect(sample) → DetectionResult
-  ├── If valid AND parser succeeds → output (no repair)
-  └── Else (repair loop, up to maxRetries):
-        ├── Build repair prompt (sample + broken config + errors)
-        ├── Send to LLM → corrected config
-        ├── Validate + parser-check
-        ├── If valid → output with repaired:true
-        ├── If identical JSON → stop (stub detected)
-        └── Exhausted → expose errors
-```
+Stage 6 is a product PoC stage, not a Goose harness approval gate.
 
-## Stage 7 — Evaluation and Dataset Building
+The goal is to produce a reviewable artifact showing:
 
-An evaluation harness that measures the LLM-assisted format detection pipeline accuracy against 12 example files with known expected configurations.
+- detected config
+- repaired config, if any
+- parser dry-run result
+- errors and warnings
+- suggested manual corrections
 
-### Results (Ollama, qwen2.5:3b)
+This stage helps a user accept, edit, or reject the proposed import configuration.
 
-| Metric | Rate |
-|---|---|
-| Valid JSON | 91.7% |
-| Validator Pass | 91.7% |
-| Parser Success | 66.7% |
-| Config Accuracy | 66.7% |
-| Repair Effectiveness | 40.0% |
+### Stage 7 — Evaluation and dataset building
 
-**Key finding**: Comma-delimited files achieve 100% accuracy. The model struggles with non-comma delimiters (whitespace, semicolon, tab).
+Stage 7 evaluates the PoC over a set of synthetic PnP examples.
 
-### Script: run-evaluation.sh
+Useful metrics include:
 
-The `scripts/run-evaluation.sh` script runs the full evaluation pipeline on all 12 files in `examples-extended/` with stub or Ollama.
+- valid JSON rate
+- validator pass rate
+- parser success rate
+- config accuracy
+- repair effectiveness
+- delimiter accuracy
+- header row accuracy
+- data start row accuracy
+- decimal separator accuracy
 
-```bash
-# Run with StubLlmClient (default)
-bash scripts/run-evaluation.sh
+Example report outputs may be generated under:
 
-# Run with Ollama
-bash scripts/run-evaluation.sh http://localhost:11434 qwen2.5:3b
+```text
+target/eval-outputs/
+target/evaluation-report.json
 ```
 
-Outputs:
-- `target/evaluation-report.json` — machine-readable metrics
-- `target/evaluation-report.md` — human-readable report with known failure cases
-- `target/eval-outputs/` — per-file detailed results
+### Stage 8 — Fine-tuning investigation
 
-### IntelliJ Configurations
+Fine-tuning is intentionally future work.
 
-| Configuration | LLM |
-|---|---|
-| `Run evaluation (stub)` | StubLlmClient (default) |
-| `Run evaluation (Ollama)` | Ollama qwen2.5:3b |
+It should only be considered after enough labeled examples exist:
 
-## Project Structure
-
-```
-.
-├── AGENTS.md                         # Multi-agent harness & workflow
-├── .run/                             # IntelliJ run configurations (shareable)
-├── docs/
-│   ├── adr/                          # Architecture Decision Records
-│   ├── feature-requests/             # Feature requests
-│   ├── features/                     # Feature documentation
-│   ├── specs/                        # EARS requirements & Gherkin scenarios
-│   └── testing/                      # Test strategy
-├── examples/
-│   ├── simple-pnp.csv                # Simple example (8 lines)
-│   └── messy-pnp.csv                 # Messy example (13 lines)
-├── examples-extended/                # 12 diverse PnP file examples
-├── expected-configs/                 # Expected config JSONs for extended examples
-├── src/
-│   ├── main/java/com/example/pnp/
-│   │   ├── Main.java                 # CLI entry point (sample + detect)
-│   │   ├── Sampler.java              # Core sampling logic (Stage 1)
-│   │   ├── Line.java                 # Line record
-│   │   ├── SampleResult.java         # Sample result record
-│   │   ├── ColumnSource.java         # HEADER_NAME / COLUMN_INDEX enum (Stage 2)
-│   │   ├── ColumnMapping.java        # Column mapping record (Stage 2)
-│   │   ├── PnpImportFormatConfig.java# Config model (Stage 2)
-│   │   ├── LlmClient.java            # LLM interface (Stage 2)
-│   │   ├── StubLlmClient.java        # Deterministic stub (Stage 2)
-│   │   ├── OllamaLlmClient.java      # Ollama client via Java HttpClient (Stage 3)
-│   │   ├── LlmClientFactory.java     # Factory: stub/ollama (Stage 3)
-│   │   ├── LlmOptions.java           # Provider config record (Stage 3)
-│   │   ├── LlmException.java         # LLM error exception (Stage 3)
-│   │   ├── PnpPlacement.java         # Normalized placement DTO (Stage 4)
-│   │   ├── PnpParseDryRunReport.java # Dry-run report DTO (Stage 4)
-│   │   ├── SimplePnpParser.java      # Deterministic parser (Stage 4)
-│   │   ├── RepairPromptBuilder.java  # Repair prompt builder (Stage 5)
-│   │   ├── RepairLoop.java           # Bounded repair orchestrator (Stage 5)
-│   │   ├── FormatDetectionPromptBuilder.java # Prompt builder (Stage 2)
-│   │   ├── PnpImportFormatConfigValidator.java # Validator (Stage 2)
-│   │   └── Detector.java             # Orchestrator (Stage 2)
-│   └── test/java/com/example/pnp/
-│       ├── SamplerTest.java          # 19 tests
-│       ├── MainTest.java             # 25 CLI tests (sample + detect + --llm-*)
-│       ├── FormatDetectionPromptBuilderTest.java  # 8 tests
-│       ├── PnpImportFormatConfigValidatorTest.java# 21 tests
-│       ├── StubLlmClientTest.java    # 4 tests
-│       ├── PnpImportFormatConfigSerializationTest.java # 3 tests
-│       ├── DetectorTest.java         # 4 tests
-│       ├── ExampleOutputGeneratorTest.java # 1 (generates + compares all examples)
-│       ├── LlmOptionsTest.java       # 8 tests (Stage 3)
-│       ├── LlmClientFactoryTest.java # 7 tests (Stage 3)
-│       ├── OllamaLlmClientTest.java  # 6 tests (Stage 3, offline)
-│       ├── OllamaIntegrationTest.java # 3 tests (Stage 3, opt-in)
-│       ├── SimplePnpParserTest.java   # 23 tests (Stage 4)
-│       ├── RepairPromptBuilderTest.java # 7 tests (Stage 5)
-│       ├── RepairLoopTest.java         # 6 tests (Stage 5)
-│       ├── RepairLoopExampleTest.java  # Diagnostic tool (Stage 5)
-│       └── scripts/
-│           ├── run-repair-loop.sh      # Repair loop runner (Stage 5)
-│           └── run-evaluation.sh       # Evaluation harness (Stage 7)
-├── .goose/
-│   ├── handoffs/                     # Phase transition handoffs
-│   ├── reviews/                      # Code review reports
-│   └── roles/                        # Role definitions
-└── pom.xml                           # Maven build (Java 21, Jackson, JUnit 5)
+```text
+CsvSample JSON → approved PnpImportFormatConfig JSON
 ```
 
-## Tests
+Before fine-tuning, the project should evaluate whether deterministic pre-analysis and prompt improvements solve the major failure cases.
 
-**150 tests total** (147 deterministic, 3 opt-in integration) — no network required for default run. Plus evaluation harness at `scripts/run-evaluation.sh`.
+## Separator detection improvement
 
-```bash
-mvn test                        # All tests (stub default, 3 skipped)
-mvn test -Dtest=SamplerTest     # Stage 1 sampler only
-mvn test -Dtest="*Validator*"   # Stage 2 validation only
-mvn test -Dtest="*Ollama*"      # Stage 3 Ollama offline tests
-mvn test -Dtest=SimplePnpParserTest  # Stage 4 parser tests
-mvn test -Dtest="*Parser*"      # All Stage 4 parser tests
-mvn test -Dtest=RepairPromptBuilderTest,RepairLoopTest  # Stage 5 repair tests
-mvn test -Dtest=RepairLoopExampleTest  # Stage 5 repair diagnostic (stub)
-mvn test -Dtest=RepairLoopExampleTest -Dllm.integration=true  # With Ollama
-mvn test -Dllm.integration=true # Include Ollama integration tests (requires Ollama)
-mvn test -Dtest=ExampleOutputGeneratorTest  # Generate & compare (stub)
-mvn test -Dtest=ExampleOutputGeneratorTest -Dllm.integration=true \
-  -Dllm.url=http://localhost:11434 -Dllm.model=qwen2.5:3b  # With Ollama
-```
+Stage 7 evaluation showed that failures were concentrated around non-comma delimiters. A deterministic `SeparatorCandidateAnalyzer` was implemented to pre-analyze sampled lines for delimiter candidates before calling the LLM.
 
-## Build Requirements
+The analysis computes for each candidate delimiter (`,`, `;`, `\t`, `WHITESPACE`):
+- column count consistency
+- header keyword matching (Ref, X, Y, Angle, Side)
+- confidence scores
+- recommended delimiter and decimal separator
+
+The results are injected into both the detection prompt and the repair prompt. The analyzer correctly identifies all 4 delimiter types when tested directly, though `qwen2.5:3b` does not consistently follow the hints for non-comma delimiters. A larger model would likely benefit from this pre-analysis.
+
+### Files
+
+- `src/main/java/com/example/pnp/SeparatorCandidateAnalyzer.java` — deterministic analyzer (408 lines)
+- `FormatDetectionPromptBuilder.java` — prompt now includes separator analysis
+- `RepairPromptBuilder.java` — repair prompt includes analysis on delimiter errors
+- `src/test/java/com/example/pnp/SeparatorCandidateAnalyzerTest.java` — 11 new tests
+
+### Test count
+
+**161 tests total** (158 deterministic, 3 opt-in integration) — no network required for default run.
+
+## Build requirements
 
 - Java 21+
 - Maven 3.8+
+- Optional: Ollama for local LLM tests
 
-## Multi-Agent Workflow
+## Build
 
-This project was built using a role-based Goose agent harness. See `AGENTS.md` for the full workflow definition.
+```bash
+mvn clean package
+```
 
-### Stage 1 Phases
-1. **Leader** — intake feature request, hand off to spec writer
-2. **Spec Writer** — EARS requirements + Gherkin scenarios
-3. **Implementer** — Java 21 + Maven + Jackson + JUnit 5
-4. **Reviewer** — code quality, scope compliance, test coverage
-5. **Doc Writer** — documentation updates
+## Test
 
-### Stage 2 Phases
-1. **Leader** — intake Stage 2 feature request
-2. **Spec Writer** — EARS + Gherkin for format detection
-3. **Implementer** — config model, prompt builder, validator, stub LLM, detect CLI
-4. **Reviewer** — scope compliance, validation rules, prompt quality
-5. **Doc Writer** — feature/testing/ADR docs, README update
+All default tests should be deterministic and offline:
 
-### Stage 3 Phases
-1. **Leader** — intake Stage 3 feature request
-2. **Spec Writer** — EARS + Gherkin for real LLM adapter
-3. **Implementer** — Ollama client, factory, CLI flags, error handling
-4. **Reviewer** — offline tests, stub default, no secrets, error handling
-5. **Doc Writer** — feature/testing docs, README update
+```bash
+mvn test
+```
 
-### Stage 4 Phases
-1. **Leader** — intake Stage 4 feature request (redefined: original parser, not proprietary)
-2. **Spec Writer** — EARS + Gherkin for simple deterministic parser
-3. **Implementer** — PnpPlacement, PnpParseDryRunReport, SimplePnpParser, parse CLI
-4. **Reviewer** — no proprietary code, all delimiter types, row-level errors
-5. **Doc Writer** — feature/testing docs, ADR update, README update
+Real LLM integration tests should be opt-in only.
 
-### Stage 5 Phases
-1. **Leader** — intake Stage 5 feature request (bounded repair loop)
-2. **Spec Writer** — EARS + Gherkin for repair loop
-3. **Implementer** — RepairPromptBuilder, RepairLoop, --repair-max/--no-repair CLI
-4. **Reviewer** — stub detection, bounded retries, parser verification
-5. **Doc Writer** — feature/testing docs, README update
+Example, depending on the implementation:
 
-### Stage 7 Phases
-1. **Leader** — intake Stage 7 feature request (evaluation and dataset building)
-2. **Spec Writer** — EARS + Gherkin for evaluation metrics and report format
-3. **Implementer** — `scripts/run-evaluation.sh`, per-file results, known failure cases
-4. **Reviewer** — metrics accuracy, report completeness, no regressions
-5. **Doc Writer** — feature/testing docs, README, AGENTS.md update
+```bash
+mvn test -Dllm.integration=true
+```
+
+## Common commands
+
+Sample a file:
+
+```bash
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar sample examples/simple-pnp.csv
+```
+
+Detect an import configuration:
+
+```bash
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.csv
+```
+
+Parse with an expected or proposed config:
+
+```bash
+java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar parse examples/simple-pnp.csv expected-configs/simple-pnp.config.json
+```
+
+Run evaluation, depending on the current CLI/test harness:
+
+```bash
+mvn test -Dtest=*Evaluation*
+```
+
+or use the project-specific evaluation command documented under `docs/testing/`.
+
+## Example config shape
+
+```json
+{
+  "schemaVersion": 1,
+  "confidence": 0.91,
+  "delimiter": ";",
+  "quoteChar": "\"",
+  "encoding": "UTF-8",
+  "linesToIgnore": [0, 1, 2, 3, 4, 10, 11],
+  "headerRowIndex": 5,
+  "dataStartRowIndex": 6,
+  "dataEndRowIndex": 9,
+  "decimalSeparator": ",",
+  "columns": {
+    "reference": {
+      "source": "HEADER_NAME",
+      "value": "RefDes"
+    },
+    "partNumber": {
+      "source": "HEADER_NAME",
+      "value": "PartNo"
+    },
+    "jedec": {
+      "source": "HEADER_NAME",
+      "value": "Package"
+    },
+    "x": {
+      "source": "HEADER_NAME",
+      "value": "X-Pos"
+    },
+    "y": {
+      "source": "HEADER_NAME",
+      "value": "Y-Pos"
+    },
+    "angle": {
+      "source": "HEADER_NAME",
+      "value": "Angle"
+    },
+    "side": {
+      "source": "HEADER_NAME",
+      "value": "MountSide"
+    }
+  },
+  "units": {
+    "x": "mm",
+    "y": "mm",
+    "angle": "deg"
+  },
+  "valueMappings": {
+    "side": {
+      "T": "Top",
+      "B": "Bottom"
+    }
+  },
+  "warnings": []
+}
+```
+
+## Repository structure
+
+The repository may contain:
+
+```text
+.
+├── AGENTS.md
+├── README.md
+├── LICENSE
+├── pom.xml
+├── docs/
+│   ├── adr/
+│   ├── feature-requests/
+│   ├── features/
+│   ├── specs/
+│   └── testing/
+├── examples/
+├── examples-extended/
+├── expected-configs/
+├── src/
+│   ├── main/java/com/example/pnp/
+│   └── test/java/com/example/pnp/
+└── target/
+```
+
+## Multi-agent workflow
+
+This project is developed using a role-based Goose agent harness.
+
+See:
+
+```text
+AGENTS.md
+.goose/roles/
+.goose/workflows/
+```
+
+Typical workflow:
+
+```text
+Leader
+  ↓
+Spec Writer
+  ↓
+Human spec approval
+  ↓
+Implementer
+  ↓
+Reviewer
+  ↓
+Human implementation approval
+  ↓
+Doc Writer
+  ↓
+Human final approval
+```
+
+## Data safety
+
+Do not commit proprietary or customer PnP files.
+
+Use synthetic examples unless the file is explicitly approved for public use.
+
+Do not copy proprietary parser behavior or internal company documentation into this repository.
+
+## License
+
+This project is released under the MIT License.
+
+See [LICENSE](LICENSE).

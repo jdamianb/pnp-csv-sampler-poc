@@ -64,11 +64,32 @@ public class FormatDetectionPromptBuilder {
             The "side" field is optional.
             """;
 
+    private static final String SEPARATOR_HEADER = """
+            DETERMINISTIC SEPARATOR ANALYSIS:
+            The following candidates were computed before calling the LLM.
+            Use these candidates as strong evidence.
+            Do not default to comma if another candidate has much higher confidence.
+            
+            """;
+
+    private static final String SEPARATOR_INSTRUCTIONS = """
+            If the top-ranked delimiter candidate has high confidence and is consistent with the sampled rows, use it unless there is clear contradictory evidence.
+            For TSV files, use "\\t" as delimiter.
+            For whitespace-delimited files, use "WHITESPACE" as delimiter.
+            For semicolon files with decimal comma, use ";" as delimiter and "," as decimalSeparator.
+            """;
+
     private static final String SAMPLE_HEADER = """
             Below is the raw numbered sample from the PnP file.
             Each line shows its zero-based index followed by the exact raw text.
             
             """;
+
+    private final SeparatorCandidateAnalyzer separatorAnalyzer;
+
+    public FormatDetectionPromptBuilder() {
+        this.separatorAnalyzer = new SeparatorCandidateAnalyzer();
+    }
 
     /**
      * Build a prompt from the given sample.
@@ -78,12 +99,25 @@ public class FormatDetectionPromptBuilder {
      */
     public String build(SampleResult sample) {
         var sampleLines = buildSampleLines(sample);
+        var separatorJson = buildSeparatorAnalysis(sample);
 
         return SYSTEM_CONTEXT.trim() + "\n\n"
                 + SCHEMA_INSTRUCTION.trim() + "\n\n"
+                + SEPARATOR_HEADER.trim() + "\n"
+                + separatorJson + "\n\n"
+                + SEPARATOR_INSTRUCTIONS.trim() + "\n\n"
                 + SAMPLE_HEADER.trim() + "\n"
                 + sampleLines + "\n\n"
                 + "Return ONLY the JSON configuration object.";
+    }
+
+    private String buildSeparatorAnalysis(SampleResult sample) {
+        try {
+            var analysis = separatorAnalyzer.analyze(sample);
+            return separatorAnalyzer.toJson(analysis);
+        } catch (Exception e) {
+            return "{\"error\": \"" + e.getMessage() + "\"}";
+        }
     }
 
     private static String buildSampleLines(SampleResult sample) {

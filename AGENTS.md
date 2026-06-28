@@ -190,6 +190,13 @@ Feature documentation is stored under `docs/` with the feature name as the file 
 - `scripts/run-evaluation.sh`
 - `expected-configs/`
 
+### Separator Detection Improvement
+
+- `prompt-separator-detection.md` — original improvement prompt
+- `docs/specs/separator-detection-improvement-spec.md`
+- `docs/features/separator-detection-improvement.md`
+- `docs/testing/separator-detection-improvement.md`
+
 Agents should read the relevant docs before working on a feature.
 
 ## PoC stages
