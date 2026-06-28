@@ -1,12 +1,13 @@
 # PnP CSV Sampler & Format Detector — Proof of Concept
 
-A Java 21 PoC with five stages:
+A Java 21 PoC with six stages:
 
 1. **Stage 1 — CSV Sampler**: Deterministically reads Pick-and-Place (PnP) CSV/TSV files as raw text and produces a structured JSON sample.
 2. **Stage 2 — LLM-assisted Format Detection**: Proposes a `PnpImportFormatConfig` (delimiter, columns, units, etc.) using an LLM client abstraction, validated before output.
 3. **Stage 3 — Real LLM Adapter**: Adds Ollama support behind the existing pipeline. Default remains stub (offline).
 4. **Stage 4 — Simple Open PnP Parser**: A deterministic parser that validates whether a proposed `PnpImportFormatConfig` can actually parse the file. Produces a `PnpParseDryRunReport` with row-level errors.
 5. **Stage 5 — Repair Loop**: A bounded repair loop that automatically corrects invalid `PnpImportFormatConfig` proposals by sending validation and parser errors back to the LLM.
+6. **Stage 7 — Evaluation and Dataset Building**: An evaluation harness that measures the LLM-assisted format detection accuracy across 12 example files, with known failure cases documented.
 
 ## Quick Start
 
@@ -43,6 +44,12 @@ java -jar target/pnp-csv-sampler-0.1.0-SNAPSHOT.jar detect examples/simple-pnp.c
 
 # Run repair loop on all examples with Ollama
 bash scripts/run-repair-loop.sh http://localhost:11434 qwen2.5:3b
+
+# Stage 7: Run evaluation (stub)
+bash scripts/run-evaluation.sh
+
+# Run evaluation with Ollama
+bash scripts/run-evaluation.sh http://localhost:11434 qwen2.5:3b
 
 # Generate and compare all example outputs (stub)
 mvn test -Dtest=ExampleOutputGeneratorTest
@@ -237,14 +244,45 @@ detect <file> [--repair-max N]
         └── Exhausted → expose errors
 ```
 
-### Script: run-repair-loop.sh
+## Stage 7 — Evaluation and Dataset Building
 
-The `scripts/run-repair-loop.sh` script runs the repair loop with Ollama on all files in `examples-extended/` and compares results against `expected-configs/`.
+An evaluation harness that measures the LLM-assisted format detection pipeline accuracy against 12 example files with known expected configurations.
+
+### Results (Ollama, qwen2.5:3b)
+
+| Metric | Rate |
+|---|---|
+| Valid JSON | 91.7% |
+| Validator Pass | 91.7% |
+| Parser Success | 66.7% |
+| Config Accuracy | 66.7% |
+| Repair Effectiveness | 40.0% |
+
+**Key finding**: Comma-delimited files achieve 100% accuracy. The model struggles with non-comma delimiters (whitespace, semicolon, tab).
+
+### Script: run-evaluation.sh
+
+The `scripts/run-evaluation.sh` script runs the full evaluation pipeline on all 12 files in `examples-extended/` with stub or Ollama.
+
+```bash
+# Run with StubLlmClient (default)
+bash scripts/run-evaluation.sh
+
+# Run with Ollama
+bash scripts/run-evaluation.sh http://localhost:11434 qwen2.5:3b
+```
 
 Outputs:
-- `target/repair-loop-results/` — JSON per file with repair metadata
-- `target/repair-loop-logs/` — diagnostic logs with repair prompts and LLM responses
-- Summary with breakdown: valid immediately, repaired, failed after repair, detection failed
+- `target/evaluation-report.json` — machine-readable metrics
+- `target/evaluation-report.md` — human-readable report with known failure cases
+- `target/eval-outputs/` — per-file detailed results
+
+### IntelliJ Configurations
+
+| Configuration | LLM |
+|---|---|
+| `Run evaluation (stub)` | StubLlmClient (default) |
+| `Run evaluation (Ollama)` | Ollama qwen2.5:3b |
 
 ## Project Structure
 
@@ -304,7 +342,8 @@ Outputs:
 │       ├── RepairLoopTest.java         # 6 tests (Stage 5)
 │       ├── RepairLoopExampleTest.java  # Diagnostic tool (Stage 5)
 │       └── scripts/
-│           └── run-repair-loop.sh      # Repair loop runner (Stage 5)
+│           ├── run-repair-loop.sh      # Repair loop runner (Stage 5)
+│           └── run-evaluation.sh       # Evaluation harness (Stage 7)
 ├── .goose/
 │   ├── handoffs/                     # Phase transition handoffs
 │   ├── reviews/                      # Code review reports
@@ -314,7 +353,7 @@ Outputs:
 
 ## Tests
 
-**150 tests total** (147 deterministic, 3 opt-in integration) — no network required for default run.
+**150 tests total** (147 deterministic, 3 opt-in integration) — no network required for default run. Plus evaluation harness at `scripts/run-evaluation.sh`.
 
 ```bash
 mvn test                        # All tests (stub default, 3 skipped)
@@ -375,3 +414,10 @@ This project was built using a role-based Goose agent harness. See `AGENTS.md` f
 3. **Implementer** — RepairPromptBuilder, RepairLoop, --repair-max/--no-repair CLI
 4. **Reviewer** — stub detection, bounded retries, parser verification
 5. **Doc Writer** — feature/testing docs, README update
+
+### Stage 7 Phases
+1. **Leader** — intake Stage 7 feature request (evaluation and dataset building)
+2. **Spec Writer** — EARS + Gherkin for evaluation metrics and report format
+3. **Implementer** — `scripts/run-evaluation.sh`, per-file results, known failure cases
+4. **Reviewer** — metrics accuracy, report completeness, no regressions
+5. **Doc Writer** — feature/testing docs, README, AGENTS.md update

@@ -181,6 +181,15 @@ Feature documentation is stored under `docs/` with the feature name as the file 
 - `docs/features/stage5-repair-loop.md`
 - `docs/testing/stage5-repair-loop.md`
 
+### Stage 7 — Evaluation and Dataset Building
+
+- `docs/feature-requests/stage7-evaluation.md`
+- `docs/specs/stage7-evaluation-spec.md`
+- `docs/features/stage7-evaluation.md`
+- `docs/testing/stage7-evaluation.md`
+- `scripts/run-evaluation.sh`
+- `expected-configs/`
+
 Agents should read the relevant docs before working on a feature.
 
 ## PoC stages
@@ -377,24 +386,30 @@ Goal:
 
 Measure whether the PoC reduces manual import setup.
 
-Allowed:
+Status: Implemented.
 
-- evaluation folder
-- representative synthetic sample files
-- expected config JSON files
-- expected normalized placement JSON files
-- accuracy report
-- manual correction count
-- time-saved notes
+Delivered:
 
-Metrics should include:
+- `scripts/run-evaluation.sh` — evaluation harness that processes all 12 example files
+- `target/evaluation-report.json` — machine-readable metrics report
+- `target/evaluation-report.md` — human-readable evaluation summary with known failure cases
+- `target/eval-outputs/` — per-file detailed results
+- IntelliJ configurations for stub and Ollama evaluation runs
+
+Metrics tracked:
 
 - valid JSON rate
 - validator pass rate
 - parser dry-run success rate
-- number of manual corrections
-- files fully solved without correction
-- files requiring fallback
+- config accuracy (compared against expected-configs/)
+- repair effectiveness (failures converted to successes)
+- per-file breakdown
+
+Known limitations (with qwen2.5:3b):
+
+- 100% accuracy on comma-delimited files
+- 0% accuracy on non-comma delimiters (whitespace, semicolon, tab)
+- Larger models or better prompt engineering would improve results
 
 ### Stage 8: Future fine-tuning investigation
 
